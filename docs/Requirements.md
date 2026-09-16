@@ -506,7 +506,7 @@ Settings（agent Actor の権限、トークンの発行・失効、agent Actor 
 - 一覧は既定で done / archived / cancelled を表示しない。絞り込みを変えれば表示できる（完全削除を持たないため、終わったものが日常の一覧に紛れないようにする）
 - 子 Task がすべて終わった親 Task を一覧で分かるようにする
 - todo に戻った Task には「回答済み」「差し戻し済み」を表示する。専用の項目は持たず、最後の状態変更の Activity から判定する（S-03, S-04）
-- in_progress の Task には、最後に変更された日時（Task の updated_at）を表示する（放置された Task に気づくため。S-03）
+- 終わっていない Task（todo / in_progress / blocked / review）には、最後に変更された日時（Task の updated_at）を表示する（未着手・作業中・回答待ち・確認待ちのまま放置された Task に気づくため。S-02〜S-04）
 - コメントの投稿と状態の変更（blocked → todo、review → todo）を1回の操作で行える（F-TSK-09）
 - Web UI のすべての画面・操作を、PC の幅だけでなくスマホの幅でも使えるようにする（外出先の端末から、どの操作も行う可能性があるため）
 
