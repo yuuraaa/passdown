@@ -1,0 +1,20 @@
+services:
+  passdown:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: passdown-dev
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - ./data:/data
+    environment:
+      PASSDOWN_DB_PATH: /data/passdown.sqlite3
+      PASSDOWN_BACKUP_DIR: /data/backups
+      PASSDOWN_HOST: 0.0.0.0
+      PASSDOWN_PORT: "3000"
+      PASSDOWN_MCP_ALLOWED_HOSTS: ${PASSDOWN_MCP_ALLOWED_HOSTS:-localhost}
+    ports:
+      - "${PASSDOWN_DEV_PORT:-3100}:3000"
+    command: sleep infinity
