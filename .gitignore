@@ -1,0 +1,5 @@
+node_modules/
+dist/
+
+# DB とバックアップ（設計書 2.9）
+data/
