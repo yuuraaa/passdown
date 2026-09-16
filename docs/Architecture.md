@@ -73,8 +73,10 @@ flowchart LR
 
 - `createMcpHandler` を使い、セッションを持たずに、リクエストのたびにサーバーを作る
 - ツールは、リクエストのたびに、認証した agent Actor の権限に合うものだけを登録する。これで、権限外のツールを表示しない（F-AUTH-04）。権限を変えると、次のリクエストから反映される
+  - 登録するツールが1つもない Actor には、SDK が tools の機能自体を宣言しないため、`tools/list` はエラーになる。表示するツールがないことに変わりはないため、問題にしない
+- ツールの説明は MCP の層（`mcp/descriptions.ts`）に、操作の名前ごとに書く。`routes` に `'mcp'` を含む操作に説明がなければ、登録のときにエラーにする
 - `create_document`・`update_document` の説明文には、ツールを登録するときに document モジュールの関数で既存のタグの一覧を読んで入れる（要件定義書 F-DOC-02）。エージェントが既存のタグを見てから付けられるようにするため
-- SDK はトークンを検証しないため、SDK の手前に置いた自前のミドルウェアで Bearer トークンを検証し、Actor を `authInfo` として SDK に渡す
+- SDK はトークンを検証しないため、SDK の手前に置いた自前のミドルウェアで Bearer トークンを検証し、Actor を `authInfo`（`extra.actor`）として SDK に渡す。トークンが無い・無効なら、SDK に渡さずに 401 を返す
 - プロトコルは 2026-07-28 版と 2025 年版の両方を受ける（SDK の既定）
   - 2025 年版のクライアントがサーバーからの通知用のストリーム（GET）を開こうとすると 405 を返すが、passdown には通知を送る要件がないため問題にしない
 - `createMcpHonoApp` の `allowedHosts`・`allowedOrigins` を必ず設定する。既定の `127.0.0.1` バインドなら Host・Origin を localhost 系で検証するが、コンテナでは `0.0.0.0` にバインドするためこの既定が外れる（2.9）
@@ -108,9 +110,12 @@ flowchart LR
 
 - 適用はプロセスの起動処理で行い、成功したときだけサーバーを開始する。失敗したまま古いスキーマで動かさないため
 - 適用の前に、SQLite のファイルを日時付きでコピーして残す。SQLite では列挙値の変更などがテーブルの作り直しになり（5.1）、失敗や想定外の結果のときに、変更の直前の断面から戻せるようにするため。置き場所と残す数は 2.7 のとおり
+  - コピーは日次のバックアップ（2.7）と同じく `VACUUM INTO` で取る。前回のプロセスの `-wal` に残った変更も含めた、一貫した断面になるため
+  - コピーを残すのは、未適用のマイグレーションがあり、かつ DB にテーブルがあるときだけ。起動のたびに残すと、世代の上限（5）で変更の直前の断面が押し出されるため。初回の起動（空の DB）は戻す先がないため残さない
+- 適用はマイグレーションごとではなく、未適用のものをまとめて1つのトランザクションで行う（Drizzle の既定）。途中で失敗したら、どれも適用されない
 - 適用済みかどうかは drizzle-kit の管理テーブルが持つ。適用の記録は Activity に書かない。業務のデータの変更ではないため（要件定義書 6.6）
 - プロセスは1つのため（1章）、適用が同時に走ることはない。排他の仕組みは持たない
-- 実装の間は、マイグレーションの SQL を作らず `drizzle-kit push` でスキーマを当て、開発用の DB は必要になったら作り直す。v1 を出す時点のスキーマから最初のマイグレーション（`0000`）を1本だけ生成し、以降は変更のたびに生成してリポジトリに入れる
+- 実装の間は、マイグレーションの SQL を作らず `drizzle-kit push` でスキーマを当て、開発用の DB は必要になったら作り直す。マイグレーションの置き場所（`drizzle/`）がなければ、起動処理は適用を飛ばす。v1 を出す時点のスキーマから最初のマイグレーション（`0000`）を1本だけ生成し、以降は変更のたびに生成してリポジトリに入れる
   - 設計が動く間は、途中の差分の SQL を残しても読み返す相手がいない。守るべきデータが入るのは v1 を出した後のため
 
 ### 2.7 バックアップと復元
@@ -134,6 +139,7 @@ flowchart LR
 | lint | ESLint ＋ typescript-eslint ＋ eslint-plugin-boundaries |
 | 整形 | Biome の formatter |
 | テスト | Vitest |
+| 開発時のサーバーの起動 | tsx（`npm run dev:server`） |
 | TypeScript の版 | 6.0 系 |
 | Node の版 | 22 以上（better-sqlite3 13 の `engines` が `node >= 22`。コンテナで使う版は別途決める） |
 
@@ -151,7 +157,7 @@ flowchart LR
 
 #### lint: ESLint ＋ eslint-plugin-boundaries
 
-lint で守ると決めた規則は次の5つ。`eslint-plugin-boundaries` は、パスを「要素の種類」として宣言し、種類どうしの許可・禁止を表で書けるため、この5つをそのまま設定に落とせる。
+lint で守る規則は、次の5つと、4.4「lint で検査すること」のすべて。`eslint-plugin-boundaries` は、パスを「要素の種類」として宣言し、種類どうしの許可・禁止を表で書けるため、これらをそのまま設定に落とせる。
 
 | 守る規則 | 出典 |
 |---|---|
@@ -165,6 +171,21 @@ lint で守ると決めた規則は次の5つ。`eslint-plugin-boundaries` は�
 - Biome だけ・oxlint だけで検査する形は採らない。境界の検査を `noRestrictedImports` と glob の `overrides` の積み上げで書くことになり、モジュールが増えるたびに設定を足すことになる。速さは、この規模のコード量では選定の材料にならない
 - 要素の種類（`boundaries/elements`）はフォルダ単位、モジュールの中のファイルの役割（`boundaries/files` の `index`・`inputs`・`schema`・`operations`・`rules`）はファイル単位で宣言し、`boundaries/dependencies` の policy で組み合わせる
 - 相対 import を `.ts` のファイルまで解決させるため、`eslint-import-resolver-typescript` を入れる。解決できない import は検査されずに素通りするため、`boundaries/no-unknown-dependencies` を有効にして気づけるようにする
+- 要素の種類は `module`（`modules/*`）・`db`・`route`（`http/`・`mcp/`）・`core`・`testing`・`app`（`src/server` 直下のファイル）・`web`。`app` は、ほかのどれにも当たらないものだけが当たるよう、最後に宣言する
+- 同じ要素の中の import も検査する（`checkInternals`）。同じモジュールの中の import は許可したうえで、「判定の関数から操作の関数を import しない」「`inputs.ts` は zod と `inputs.ts` だけ」を同じモジュールの中にも効かせるため
+- policy は後ろのものが前のものを上書きする。制限を許可より後ろに置く
+- テストのファイル（`*.test.ts`）だけは、結果を確かめるために DB（`db/`・Drizzle・他のモジュールの `schema.ts`）を直接読み、アプリ全体（`app`）を組み立ててよい。テストの土台（`testing/`）はテストのファイルと `app` からだけ使える
+- try / catch と `withoutPermissionCheck` の検査は、import ではないため、`no-restricted-syntax` で書く。`createTask['withoutPermissionCheck']` の書き方も検出する
+
+#### 開発時のサーバーの起動: tsx
+
+- サーバー側の相対 import は `.js` を付けて書く（`moduleResolution: nodenext`）。Node の型の除去（type stripping）は `.js` を `.ts` に読み替えないため、開発時は tsx で直接起動する
+- 本番のビルドの方法は、本番用のコンテナイメージを作るときに決める
+
+#### better-sqlite3 のインストール
+
+- better-sqlite3 13 は主な環境向けのビルド済みバイナリをパッケージに同梱していて、インストール時のスクリプトは要らない
+- `package.json` の `allowScripts` で better-sqlite3 のスクリプトを許可しない。許可すると、`binding.gyp` があるため npm が既定で `node-gyp rebuild` を走らせ、Python の無いイメージ（`node:24-bookworm-slim`）では失敗する
 
 #### テスト: Vitest
 
@@ -279,17 +300,17 @@ lint で守ると決めた規則は次の5つ。`eslint-plugin-boundaries` は�
 - 当たった箇所の抜粋（スニペット）は返さない。Task の description・result・blocked_reason と Document の content は長くなりうるため、当たった項目の名前だけを返し、本文は `get_task`・`get_document`（画面では詳細の画面）で読む
 - コメントだけは本文をそのまま返す。コメントは短く、過去の判断をコメントから確かめる用途（要件定義書 S-06）で、本文が見えないと次に何を開くか決められないため
 
-Task の結果の形（項目名は仮）:
+Task の結果の形（MCP での例。項目名は 7.6 のとおりキャメルケース）:
 
 ```
 {
   id: "task:24",
   title: "承認フローの設計",
   status: "in_progress",
-  updated_at: "...",
-  matched_fields: ["title"],
-  matched_comments: [
-    { id: "comment:101", body: "...", created_at: "..." }
+  updatedAt: "...",
+  matchedFields: ["title"],
+  matchedComments: [
+    { id: "comment:101", body: "...", createdAt: "..." }
   ]
 }
 ```
@@ -299,13 +320,13 @@ Task の結果の形（項目名は仮）:
 #### 並び順
 
 - Task・Document とも、更新日時の新しい順（`ORDER BY updated_at DESC, id DESC`）で返す
-- `matched_comments` は、Task のコメントと同じく id の順（投稿した順、5.5）に並べる
+- `matchedComments` は、Task のコメントと同じく id の順（投稿した順、5.5）に並べる
 - 並び順は経路で変えない。REST API・MCP とも同じ順で返す
 
 #### 件数の上限
 
 - 既定で50件まで返し、呼び出し側が指定できる上限は200件とする。打ち切ったときは、当たった総数を添える
-- `matched_comments` は Task ごとに最大5件。当たったコメントが多いときは新しい方から5件を選び、並べるときは id の順にする
+- `matchedComments` は Task ごとに最大5件。当たったコメントが多いときは新しい方から5件を選び、並べるときは id の順にする
 - 上限を件数で持つ考え方は 6.2 と同じ
 
 ---
@@ -414,9 +435,15 @@ flowchart TB
 
 ```
 src/server/
+  main.ts          起動処理（設定の読み込み → マイグレーション → サーバーの開始）
+  app.ts           Web UI の配信・REST API・MCP を1つの Hono のアプリに組み立てる
+  config.ts        環境変数の読み込みと検証（2.9）
+  operations.ts    起点の操作の一覧（レジストリ。4.9）
+  core/            共通の仕組み: defineOperation・Ctx・エラーのクラス・日時・列の型
   http/            経路の層: REST API
   mcp/             経路の層: MCP
   db/              DB への接続・マイグレーション
+  testing/         テストの土台: インメモリの DB・データの用意・表駆動のテストの入力
   modules/         業務ロジックの層
     auth/          Actor・トークン・ログインのセッション・権限
     project/       Project・Project が参照する Document
@@ -449,6 +476,9 @@ modules/task/
 - コメントは Task の権限に含まれる（要件定義書 F-AUTH-03）ため、task モジュールに置く
 - activity は、すべてのモジュールが Activity の記録に使うため、独立したモジュールにする
 - search は、Task と Document を横断するため、独立したモジュールにする（3.4）
+- `core/` は、どのモジュールにも属さない共通の仕組みを置く。業務ロジックの層・経路の層・`db/` から使ってよく、`core/` から他の要素は import しない。業務のルールは置かない
+- `testing/` は、テストのファイルからだけ使う。インメモリの DB には、drizzle-kit の生成の仕組み（`drizzle-kit/api`）で全モジュールの `schema.ts` から作った CREATE 文を当てる（`drizzle-kit push` と同じ）
+- activity の `inputs.ts` は、event_type・entity_type の列挙値と、他の行を指す id の入力の部品（`entityId('task')` 等。5.1）を持つ。entity_type は Activity の対象の種類で、`<種類>:<id>` の種類の語と同じもののため
 
 #### lint で検査すること
 
@@ -609,6 +639,7 @@ export const approveTask = defineOperation({
   routes: ['web'],
   requires: [['task', 'readwrite']],
   returns: [],
+  entity: 'task',
   input: approveTaskInput,
   run: (ctx, input) => { /* 読む → 判定する → 書く */ },
 })
@@ -620,13 +651,15 @@ export const approveTask = defineOperation({
 | `routes` | この操作を出す経路。`['web']` か `['web', 'mcp']` |
 | `requires` | 必要な権限。リソースと段階（read / readwrite）の組の一覧 |
 | `returns` | 結果に含む、自分以外のリソースの種類（下の「read 権限による絞り込み」） |
+| `entity` | 結果が表すリソースの種類（`task` 等）。MCP の層が結果の `id` を `<種類>:<id>` に変えるのに使う（5.1） |
 | `input` | 入力のスキーマ（4.7） |
 | `run` | 読む → 判定する → 書く（4.2） |
 
 - 項目はすべて必須にする。要らない場合も `[]` を書く（書き忘れと区別がつかなくなるため）
 - `defineOperation` が返す関数は、呼ばれると **入力の検証（4.7）→ 権限の確認 → トランザクションを張って `run` を実行（4.2）** の順に行う。`run` の中でトランザクションを張り直さない
 - 他のモジュールから呼ばれるだけの関数（4.5 の「持ち主のモジュールの読み取り・書き込みの関数」）は `defineOperation` を使わず、普通の関数にして自分でトランザクションを張る
-- 起点の操作を `index.ts` に並べる（4.5）ことで、宣言の一覧（レジストリ）が得られる。経路の層への登録と、下のテストはこの一覧から作る
+- 起点の操作を `index.ts` に並べる（4.5）ことで、宣言の一覧（レジストリ）が得られる。`src/server/operations.ts` が、各モジュールの `index.ts` から `defineOperation` で作った値を集める。経路の層への登録と、下のテストはこの一覧から作る
+- `routes` は `['web']` か `['web', 'mcp']` の2通りだけを型で許す。MCP の層は `routes` が `['web', 'mcp']` の操作の型（`McpOperation`）しか受け取らない
 
 #### 権限の確認は起点だけが行う
 
@@ -678,7 +711,9 @@ export const approveTask = defineOperation({
 | REST への登録漏れ | `routes` に `'web'` を含む操作が、REST API が登録した経路の中にすべてある（7.2） |
 | Activity の記録漏れ | 操作の関数のテストで共通のヘルパ（`expectRecorded`）を通して呼び、`activities` 以外のテーブルが変わったのに `activities` が増えていなければ失敗させる |
 
-- 表駆動のテストには、操作ごとに通る入力とデータの用意が要る。これは操作の関数のテスト（4.3）と共用する
+- 表駆動のテストには、操作ごとに通る入力とデータの用意が要る。`testing/scenarios.ts` に操作の名前ごとに書き、操作の関数のテスト（4.3）と共用する。用意が無い操作・`returns` のリソースを確かめる関数が無い操作は、テストが失敗する
+- 権限のテストは、`requires` の権限を1段下げた Actor（readwrite なら read、read なら none）で呼び、何も書かれないことも確かめる
+- REST への登録漏れは、経路の層が操作を登録するときに名前を記録し（`http/registry.ts` の `expose`）、その記録と一覧を照らし合わせる
 - 自動で起きる変更は、どれを・どう変えるかを判定の関数のテストで、対象ごとに1行の Activity が起点の Actor・経路で記録されることを操作の関数のテストで確かめる（4.3）
 - これらは 4.3 のテストに加えて行う。4.3 の粒度は変えない
 
@@ -720,6 +755,9 @@ export const approveTask = defineOperation({
   - id はテーブルごとの連番のため、種類を取り違えても別の行が実在してしまう。弾かなければ、黙って違うものを返す
   - 結果に出てくる表記と、次のツールに渡す値が同じ形になり、本文に書かれた `task:24` もそのまま渡せる
 - 業務ロジックの層と REST API は、数値の id をそのまま使う。`<種類>:<id>` の形にするのは、MCP の層と画面の表示だけ。REST API は経路（パス）で、Web UI は型で種類が決まっているため、変換を境界の1か所に閉じる
+- 入力のスキーマ（`inputs.ts`）では、他の行を指す id を数値のまま、zod の meta で種類を付けて書く（`entityId('task')`）。MCP の層は、ツールを登録するときにスキーマをたどり、種類の付いた項目を「`task:<数値>` の形の文字列を受け取って数値に変える」項目に置き換える。REST API と MCP で同じスキーマを使う（4.7）まま、ツールの入力の説明（JSON Schema）にも `^task:[1-9][0-9]*$` の形が載る
+- 結果の id は、MCP の層が項目名で変える。`id` の種類は起点の操作の `entity`（4.9）で決め、`projectId`・`parentId`・`assigneeId`・`createdBy` 等は項目名と種類の対応表で決める。一覧の `items` は `id` と同じ種類として扱う。他のリソースを入れ子で返す操作を足すときは、入れ子の項目名と種類の対応を足す
+- 業務のエラーの文（4.6）では、行を `<種類>:<id>` の形で書く。REST API・MCP のどちらでも読み手に種類が分かるようにするため
 - Web UI の URL は `/tasks/24` の形にする。パスの語が種類を表すため、重ねて書かない
 - 例外として、対応だけを表すテーブル（`document_tags` 等）は id を持たず、対応する列の組を複合主キーにする。行が他から id で指されることがなく、重複を主キーで防げるため
 
@@ -819,7 +857,7 @@ sessions
 
 #### ログインのセッション
 
-- セッションは DB の `sessions` に持つ。Cookie にはランダムなセッション ID を入れ、DB には SHA-256 のハッシュを保存する
+- セッションは DB の `sessions` に持つ。Cookie（`passdown_session`）にはランダムなセッション ID を入れ、DB には SHA-256 のハッシュを保存する
   - ログアウト・パスワードの再設定のときに、サーバーの側でセッションを確実に無効にでき、コンテナを再起動してもログインが切れないため
 - ログアウトしたとき・期限が切れたときは、行を消す。セッションは Activity に記録する変更の対象ではない一時的な認証の情報で、要件定義書 設計原則7（消さない）の対象の業務のデータではないため。期限切れの行は、ログインの処理のときにまとめて消す（v1 は自動処理を持たないため）
 - 有効期限は、使うたびに延ばす（無操作が14日続いたら切れる）。何日使っても必ず切れる絶対の上限は設けない
@@ -906,6 +944,7 @@ task_comments
 
 - 親子は `parent_id` だけで持つ。子孫・祖先は再帰の SQL（`WITH RECURSIVE`）で読む。親の付け替えが1列の更新で済み、Task の規模と階層の深さでは再帰の SQL で足りるため
 - 再帰の SQL は子孫・祖先を読むことにだけ使う。cancel の対象・連動の対象・循環するかは、読んだ結果を判定の関数に渡して決める（4.2）
+- 子 Task が in_progress になったときの連動は、祖先を近い順にたどり、todo の祖先を in_progress にする。todo でない祖先（in_progress・blocked）に当たったら、そこで止める。その祖先は状態が変わらず、そこから上へ連動するきっかけがないため
 
 #### project_id
 
@@ -1067,7 +1106,7 @@ activities
 
 #### before / after
 
-- JSON で、変わった項目だけを入れる。変わった項目の変更前の値を before に、変更後の値を after に入れる（例: `before: {"status":"blocked","blocked_reason":"…"}`、`after: {"status":"todo","blocked_reason":""}`）。画面で何が変わったかがそのまま分かり、「回答済み」「差し戻し済み」の判定も before の status を読むだけで済むため
+- JSON で、変わった項目だけを入れる。変わった項目の変更前の値を before に、変更後の値を after に入れる（例: `before: {"status":"blocked","blockedReason":"…"}`、`after: {"status":"todo","blockedReason":""}`。項目名は 7.6 のとおりキャメルケース）。画面で何が変わったかがそのまま分かり、「回答済み」「差し戻し済み」の判定も before の status を読むだけで済むため
 - 作成の記録は、before を `{}` にし、after に作成した項目を入れる
 - description・content などの長い文章も、変わったときは変更前後の全文を入れる。Document の版の履歴を持たない（要件定義書 5.2）ため、これが唯一の変更の記録になる
 - トークン・パスワード・セッションのハッシュは入れない
@@ -1284,18 +1323,21 @@ Web UI 専用の経路（1章）。ログインのセッションだけを受け
 ### 7.6 応答の形
 
 - 応答は常に JSON。1件を返す操作はリソースそのもの、一覧は `{ items, total }`（7.4）
+- JSON の項目名はキャメルケース（`acceptanceCriteria`・`updatedAt`）にする。MCP のツールの入力・結果、Activity の before / after も同じ。Drizzle の TypeScript 側・zod のスキーマ・Hono RPC の型とそのまま一致し、境界で名前を変換する層が要らないため。REST API と MCP は同じ入力のスキーマを使う（4.7）ため、両方が同じ書き方になる
 - 何も返さない操作（ログアウト等）も `204` ではなく `200` と JSON で返す。Hono RPC の型と TanStack Query の扱いを1つに揃えるため
 - エラーは `{ error: { type, message } }` の形にする。`type` は 4.6 のエラーの種類と1対1に対応する
 
 | `type` | HTTP ステータス | 4.6 の種類 |
 |---|---|---|
 | `invalid_input` | 400 | 入力が不正 |
+| `unauthorized` | 401 | （経路の層だけ）ログインしていない・セッションの期限切れ |
 | `forbidden` | 403 | 権限がない |
 | `not_found` | 404 | 見つからない |
 | `not_allowed` | 409 | 操作できない |
 | `conflict` | 409 | 競合（楽観ロック） |
 | `internal` | 500 | 想定外 |
 
+- `unauthorized` は業務のエラー（4.6）ではなく、経路の層の認証で返す。MCP でトークンが無い・無効なときも、SDK に渡す前に 401 と同じ形の JSON を返す
 - 「操作できない」と「競合」はどちらも 409 のため、`type` で見分ける（4.6 の「競合と分かる印」）。Web UI は `conflict` のときだけ読み直して再実行を促す
 - `message` は、人間が読んで次に何をすればよいか分かる文にする（4.6）。`internal` のときは詳細を入れず、ログに残す
 - 経路の層の `zValidator` の既定の 400 の応答は使わず、この形に揃える（4.7）
