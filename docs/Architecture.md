@@ -133,6 +133,8 @@ flowchart LR
 | Drizzle の版 | 0.45 系（`drizzle-orm` 0.45.2 / `drizzle-kit` 0.31.10） |
 | lint | ESLint ＋ typescript-eslint ＋ eslint-plugin-boundaries |
 | 整形 | Biome の formatter |
+| テスト | Vitest |
+| TypeScript の版 | 6.0 系 |
 | Node の版 | 22 以上（better-sqlite3 13 の `engines` が `node >= 22`。コンテナで使う版は別途決める） |
 
 #### パッケージマネージャー: npm
@@ -161,6 +163,19 @@ lint で守ると決めた規則は次の5つ。`eslint-plugin-boundaries` は�
 
 - 整形は Biome の formatter に任せ、規則の検査（ESLint）と分ける
 - Biome だけ・oxlint だけで検査する形は採らない。境界の検査を `noRestrictedImports` と glob の `overrides` の積み上げで書くことになり、モジュールが増えるたびに設定を足すことになる。速さは、この規模のコード量では選定の材料にならない
+- 要素の種類（`boundaries/elements`）はフォルダ単位、モジュールの中のファイルの役割（`boundaries/files` の `index`・`inputs`・`schema`・`operations`・`rules`）はファイル単位で宣言し、`boundaries/dependencies` の policy で組み合わせる
+- 相対 import を `.ts` のファイルまで解決させるため、`eslint-import-resolver-typescript` を入れる。解決できない import は検査されずに素通りするため、`boundaries/no-unknown-dependencies` を有効にして気づけるようにする
+
+#### テスト: Vitest
+
+- Web UI のビルドに Vite を使う（2.4）ため、変換の設定を1つに揃えられる
+- DB を使わない判定のテスト・インメモリ SQLite の操作のテスト・将来の React のテストを、1つのランナーで回せる（4.3）
+
+#### TypeScript の版: 6.0 系
+
+- 2026-09-16 の時点で `latest` は 7.0.2 だが、typescript-eslint 8.70 の peer が `typescript >=4.8.4 <6.1.0` で TS 7 に対応していない
+- lint による境界の検査が開発の土台の肝（上の5つの規則）のため、typescript-eslint が対応済みの最新を採る
+- typescript-eslint が TS 7 に対応したら上げる
 
 ### 2.9 コンテナとデプロイ
 
