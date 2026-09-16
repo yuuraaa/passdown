@@ -33,7 +33,7 @@ flowchart LR
 
 - REST API と MCP は、同じ業務ロジックを通る（要件定義書 設計原則5）。MCP から DB を直接触る経路は作らない
 - 経路ごとに受け付ける認証を分ける。REST API はログインのセッションだけ、MCP はエージェントのトークンだけを受け付ける。エージェントのトークンは REST API に使えない
-- パス（`/api`・`/mcp`）は仮。
+- パスは REST API が `/api`、MCP が `/mcp`。それ以外のパスは Web UI を返す（7.1）
 
 ---
 
@@ -675,6 +675,7 @@ export const approveTask = defineOperation({
 | 権限 | 各操作について、`requires` の権限を1つずつ欠いた Actor で呼び、403 になる |
 | read の絞り込み | `returns` を持つ各操作について、そのリソースの read を持たない Actor で呼び、結果にそのリソースが含まれない |
 | 経路の制限 | `routes` に `'mcp'` を含まない操作が、MCP が登録するツールの中に現れない |
+| REST への登録漏れ | `routes` に `'web'` を含む操作が、REST API が登録した経路の中にすべてある（7.2） |
 | Activity の記録漏れ | 操作の関数のテストで共通のヘルパ（`expectRecorded`）を通して呼び、`activities` 以外のテーブルが変わったのに `activities` が増えていなければ失敗させる |
 
 - 表駆動のテストには、操作ごとに通る入力とデータの用意が要る。これは操作の関数のテスト（4.3）と共用する
@@ -1142,3 +1143,159 @@ activities
 - 上限で打ち切ったときは、打ち切ったことと残りの件数を添える。詳細は `get_task`・`get_document` で取りに行く
 
 文字数やトークン数で切る形は採らない。量の大半は本文で、本文を返さないと決めれば残るのは件数だけで足りる。文字数で切ると、途中で切れた本文が混ざり、何件返るかも呼ぶ前に分からないため。
+
+---
+
+## 7. REST API
+
+Web UI 専用の経路（1章）。ログインのセッションだけを受け付け、Hono RPC で型付きで呼ぶ（2.4）。
+
+### 7.1 パス
+
+- REST API は `/api`、MCP は `/mcp`。どちらにも版（`/api/v1` 等）を入れない
+- `/api`・`/mcp` 以外のパスは、Web UI の静的ファイルを返し、当たらなければ `index.html` を返す（SPA のため）
+- 版を入れないのは、クライアントが自分でホストする Web UI 1つだけで、サーバーと同じビルドから同時に配られる（4.8）ため。版を分けて並走させる場面が要件にない。MCP はプロトコル側で版を持つ（2.3）
+
+### 7.2 経路の決まり
+
+| 種類 | メソッドとパス |
+|---|---|
+| 一覧・取得 | `GET /api/<リソース>`・`GET /api/<リソース>/:id` |
+| 作成 | `POST /api/<リソース>` |
+| 項目の更新 | `PATCH /api/<リソース>/:id` |
+| 状態を変える操作 | `POST /api/<リソース>/:id/<動詞>` |
+
+- 起点の操作（4.9）1つに経路1つを当てる。`routes` に `'web'` を含む操作がすべて登録されていることをテストで確かめる（4.9 のテスト）
+- **状態を変える操作を `PATCH` に含めない**。要件定義書 8.1 の「状態は状態ごとの専用の操作でだけ変える」を経路にそのまま出し、`PATCH` で状態を書き換えて専用の操作の確認（review に出すときの result 必須など）を迂回できないようにするため
+- 動詞は、MCP のツール名から対象を除いたものを kebab-case で書く（`request_task_review` → `request-review`）。MCP にないもの（承認・cancel 等）も同じ形にする
+- `DELETE` はセッションの削除（ログアウト）にだけ使う。完全削除の機能を持たないため、archive・cancel・トークンの失効は `POST` の操作にする
+- id は数値をそのまま使う（5.1）。`<種類>:<id>` の形は使わない。パスの語が種類を表すため
+- 一覧の絞り込み・ページングはクエリ文字列、それ以外の入力は JSON の本文で受け取る
+- 経路の層で入力を検証し、操作の関数の先頭でもう一度検証する（4.7）
+
+### 7.3 経路の一覧
+
+#### セッション
+
+| メソッドとパス | 対応する操作 |
+|---|---|
+| `POST /api/session` | ログイン |
+| `DELETE /api/session` | ログアウト |
+| `GET /api/session` | 今ログインしている Actor を返す |
+
+#### Inbox
+
+| メソッドとパス | 対応する操作 |
+|---|---|
+| `GET /api/inbox-items` | `list_inbox_items` |
+| `POST /api/inbox-items` | `capture_inbox_item` |
+| `PATCH /api/inbox-items/:id` | `update_inbox_item` |
+| `POST /api/inbox-items/:id/convert` | `convert_inbox_item` |
+| `POST /api/inbox-items/:id/archive` | `archive_inbox_item` |
+| `GET /api/inbox-items/:id/activities` | Inbox Item の Activity（変換先をたどる。要件定義書 6.5。Web UI だけ） |
+
+#### Project
+
+| メソッドとパス | 対応する操作 |
+|---|---|
+| `GET /api/projects` | `list_projects` |
+| `POST /api/projects` | `create_project` |
+| `GET /api/projects/:id` | Project を1件取得（Project 画面） |
+| `PATCH /api/projects/:id` | `update_project`（項目・参照する Document の更新） |
+| `GET /api/projects/:id/context` | `get_project_context` |
+| `GET /api/projects/:id/activities` | Project の Activity（要件定義書 F-PRJ-03。Web UI だけ） |
+| `POST /api/projects/:id/complete` | Project を done にする（Web UI だけ） |
+| `POST /api/projects/:id/archive` | Project を archive する（Web UI だけ） |
+
+#### Task
+
+| メソッドとパス | 対応する操作 |
+|---|---|
+| `GET /api/tasks` | `list_tasks` |
+| `GET /api/tasks/actionable` | `list_actionable_tasks` |
+| `POST /api/tasks` | `create_task` |
+| `GET /api/tasks/:id` | `get_task` |
+| `PATCH /api/tasks/:id` | `update_task`（項目・親・所属 Project・参照する Document の更新） |
+| `GET /api/tasks/:id/activities` | Task の Activity（Web UI だけ） |
+| `POST /api/tasks/:id/comments` | `add_task_comment` |
+| `POST /api/tasks/:id/start` | `start_task` |
+| `POST /api/tasks/:id/block` | `block_task` |
+| `POST /api/tasks/:id/request-review` | `request_task_review` |
+| `POST /api/tasks/:id/return-to-todo` | `return_task_to_todo` |
+| `POST /api/tasks/:id/approve` | 承認（Web UI だけ） |
+| `POST /api/tasks/:id/cancel` | cancel する（Web UI だけ） |
+
+- `GET /api/tasks/actionable` を `GET /api/tasks` のクエリにしないのは、絞り込みの条件（自分が担当・todo・子 Task を持たない）と並び順（priority の高い順、4.10）が固定で、呼び出し側が指定するものではないため。id は数値のため `:id` と取り違えることはない（経路は `actionable` を先に置く）
+
+#### Document
+
+| メソッドとパス | 対応する操作 |
+|---|---|
+| `GET /api/documents` | Document の一覧（Documents 画面） |
+| `POST /api/documents` | `create_document` |
+| `GET /api/documents/:id` | `get_document` |
+| `PATCH /api/documents/:id` | `update_document`（項目・タグの更新） |
+| `POST /api/documents/:id/archive` | `archive_document` |
+| `GET /api/documents/:id/references` | 参照元の Task・Project（要件定義書 F-DOC-04） |
+| `GET /api/documents/:id/activities` | Document の Activity（Web UI だけ） |
+| `GET /api/document-tags` | 既存のタグの一覧（要件定義書 F-DOC-02） |
+
+- Document の参照の追加・削除に専用の経路を置かない。`update_task`・`update_project` の中で、`version` を受け取って行う（5.7）ため
+
+#### Actor・トークン・Activity
+
+| メソッドとパス | 対応する操作 |
+|---|---|
+| `GET /api/actors` | `list_actors` |
+| `POST /api/actors` | agent Actor の作成（Web UI だけ） |
+| `PATCH /api/actors/:id/permissions` | 権限の設定（Web UI だけ） |
+| `GET /api/actors/:id/activities` | agent Actor の Activity（要件定義書 F-ACT-02。Web UI だけ） |
+| `GET /api/actors/:id/tokens` | トークンの一覧（Web UI だけ） |
+| `POST /api/actors/:id/tokens` | トークンの発行（Web UI だけ） |
+| `POST /api/tokens/:id/revoke` | トークンの失効（Web UI だけ） |
+
+- 権限の設定を `PATCH /api/actors/:id` にまとめず、`/permissions` に分ける。Actor の項目の更新とは操作も Activity の event_type（`actor.permissions_changed`、5.9）も別のため
+
+#### 検索
+
+| メソッドとパス | 対応する操作 |
+|---|---|
+| `GET /api/search` | `search`（3章） |
+
+### 7.4 一覧のページング
+
+- 一覧はクエリの `limit`・`offset` で切り出す。`limit` の既定は50、上限は200。検索（3.5）と同じ値にする
+- 応答は `{ items, total }` の形にし、`total` に `limit` で切る前の（絞り込み後の）総件数を入れる
+- 並び順は 4.10 のとおり一覧ごとに決まっていて、呼び出し側は指定できない。id の昇順が基本で、追加は必ず末尾に入るため、読んでいる途中に行が増えても `offset` がずれない
+- 総件数を必ず返すのは、Task の一覧に状態ごとの件数を表示する（要件定義書 9.2）ためと、打ち切ったかどうかを呼び出し側が判断できるようにするため
+- MCP の一覧のツール（`list_tasks` 等）も同じ既定・上限にする。同じ操作の関数を通る（4.1）ため、経路で値を変えない
+- 例外は3つ。`get_task` のコメント（全件を必ず含める。要件定義書 8.2）、`get_project_context`（件数の上限は 6.2）、`search`（返す単位は 3.5）
+- カーソル方式は採らない。並び順が id の昇順で固定のため `offset` でずれず、任意のページに飛べて総件数も1回で得られる形の方が、画面の作りが単純になる
+
+### 7.5 楽観ロックの version
+
+- `version` は JSON の本文で受け取る。応答には、更新後のリソース全体（新しい `version` を含む）を返す
+- `version` を必須にするのは、項目を更新する4つの操作（`update_task`・`update_project`・`update_document`・`update_inbox_item`）だけ
+- 状態を変える操作（`start_task`・`block_task`・`request_task_review`・`return_task_to_todo`・承認・cancel・Project の done / archive・`archive_document`・`archive_inbox_item`）は `version` を要求しない。二重に実行されても、状態遷移の判定（4.2）が「操作できない」で弾くため（例: 先に start されていれば todo ではないので弾かれる）。要求すると、MCP のツールの必須の入力が増え、エージェントが読み直す回数も増える
+- これらの操作も、行を更新するときに `version` を1足す（5.1）。`version` を持って項目を更新しようとした側は、その後の更新で競合になる
+- コメントの投稿は `version` を上げない（5.5）
+- `version` を HTTP の `If-Match` / `ETag` で受け渡す形は採らない。`version` が入力のスキーマ（`inputs.ts`）の外に出て、REST API と MCP でスキーマが二重になり（4.7 に反する）、Hono RPC の型にも乗らないため
+
+### 7.6 応答の形
+
+- 応答は常に JSON。1件を返す操作はリソースそのもの、一覧は `{ items, total }`（7.4）
+- 何も返さない操作（ログアウト等）も `204` ではなく `200` と JSON で返す。Hono RPC の型と TanStack Query の扱いを1つに揃えるため
+- エラーは `{ error: { type, message } }` の形にする。`type` は 4.6 のエラーの種類と1対1に対応する
+
+| `type` | HTTP ステータス | 4.6 の種類 |
+|---|---|---|
+| `invalid_input` | 400 | 入力が不正 |
+| `forbidden` | 403 | 権限がない |
+| `not_found` | 404 | 見つからない |
+| `not_allowed` | 409 | 操作できない |
+| `conflict` | 409 | 競合（楽観ロック） |
+| `internal` | 500 | 想定外 |
+
+- 「操作できない」と「競合」はどちらも 409 のため、`type` で見分ける（4.6 の「競合と分かる印」）。Web UI は `conflict` のときだけ読み直して再実行を促す
+- `message` は、人間が読んで次に何をすればよいか分かる文にする（4.6）。`internal` のときは詳細を入れず、ログに残す
+- 経路の層の `zValidator` の既定の 400 の応答は使わず、この形に揃える（4.7）
