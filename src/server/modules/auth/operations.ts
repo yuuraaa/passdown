@@ -32,7 +32,13 @@ export function authenticateToken(db: Db, token: string): Actor | null {
       .select({ actor: actors })
       .from(tokens)
       .innerJoin(actors, eq(tokens.actorId, actors.id))
-      .where(and(eq(tokens.tokenHash, hashSecret(token)), isNull(tokens.revokedAt)))
+      .where(
+        and(
+          eq(tokens.tokenHash, hashSecret(token)),
+          isNull(tokens.revokedAt),
+          eq(actors.actorType, 'agent'),
+        ),
+      )
       .get()
     return row ? toActor(row.actor) : null
   })
@@ -45,7 +51,7 @@ export function authenticateSession(db: Db, sessionId: string, now: string): Act
       .select({ session: sessions, actor: actors })
       .from(sessions)
       .innerJoin(actors, eq(sessions.actorId, actors.id))
-      .where(eq(sessions.sessionHash, hashSecret(sessionId)))
+      .where(and(eq(sessions.sessionHash, hashSecret(sessionId)), eq(actors.actorType, 'human')))
       .get()
     if (!row || isSessionExpired(row.session.expiresAt, now)) {
       return null

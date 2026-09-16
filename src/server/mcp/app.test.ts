@@ -87,6 +87,17 @@ describe('認証', () => {
     expect(res.status).toBe(401)
   })
 
+  it('human のトークンは MCP に使えない', async () => {
+    const token = insertToken(database, insertActor(database, { actorType: 'human' }))
+    const res = await post(
+      { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+      {
+        Authorization: `Bearer ${token}`,
+      },
+    )
+    expect(res.status).toBe(401)
+  })
+
   it('ログインのセッションは MCP に使えない', async () => {
     const actor = insertActor(database, { actorType: 'human' })
     const sessionId = insertSession(database, actor, new Date(FIXED_NOW.getTime() + 86_400_000))

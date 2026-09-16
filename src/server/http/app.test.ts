@@ -53,6 +53,20 @@ describe('認証', () => {
     expect(res.status).toBe(401)
   })
 
+  it('agent のセッションは REST API に使えず、期限も延長しない', async () => {
+    const agent = insertActor(database)
+    const expiresAt = new Date(FIXED_NOW.getTime() + 6 * DAY)
+    const sessionId = insertSession(database, agent, expiresAt)
+
+    const res = await client({ Cookie: `passdown_session=${sessionId}` }).tasks.$post({
+      json: { title: 't' },
+    })
+
+    expect(res.status).toBe(401)
+    const row = database.db.select().from(sessions).where(eq(sessions.actorId, agent.id)).get()
+    expect(row?.expiresAt).toBe(formatDatetime(expiresAt))
+  })
+
   it('期限の切れたセッションは使えない', async () => {
     const actor = insertActor(database, { actorType: 'human' })
     const expired = insertSession(database, actor, FIXED_NOW)
@@ -117,7 +131,7 @@ describe('エラーの応答（設計書 7.6）', () => {
   })
 
   it('権限がなければ 403 forbidden', async () => {
-    const reader = insertActor(database, { permissions: { task: 'read' } })
+    const reader = insertActor(database, { actorType: 'human', permissions: { task: 'read' } })
     const sessionId = insertSession(database, reader, new Date(FIXED_NOW.getTime() + 13 * DAY))
     const res = await client({ Cookie: `passdown_session=${sessionId}` }).tasks.$post({
       json: { title: 't' },
