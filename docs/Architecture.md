@@ -1304,9 +1304,9 @@ Web UI 専用の経路（1章）。ログインのセッションだけを受け
 ### 7.4 一覧のページング
 
 - 一覧はクエリの `limit`・`offset` で切り出す。`limit` の既定は50、上限は200。検索（3.5）と同じ値にする
-- 応答は `{ items, total }` の形にし、`total` に `limit` で切る前の（絞り込み後の）総件数を入れる
+- 応答の基本は `{ items, total }` の形にし、`total` に `limit` で切る前の（絞り込み後の）総件数を入れる。`list_tasks` は状態別件数の `statusCounts` も返す（8.2）
 - 並び順は 4.10 のとおり一覧ごとに決まっていて、呼び出し側は指定できない。id の昇順が基本で、追加は必ず末尾に入るため、読んでいる途中に行が増えても `offset` がずれない
-- 総件数を必ず返すのは、Task の一覧に状態ごとの件数を表示する（要件定義書 9.2）ためと、打ち切ったかどうかを呼び出し側が判断できるようにするため
+- 総件数を必ず返すのは、打ち切ったかどうかを呼び出し側が判断できるようにするため。Task の状態ごとの件数は、選んだ状態に左右されない `statusCounts` で返す（8.2）
 - MCP の一覧のツール（`list_tasks` 等）も同じ既定・上限にする。同じ操作の関数を通る（4.1）ため、経路で値を変えない
 - 例外は3つ。`get_task` のコメント（全件を必ず含める。要件定義書 8.2）、`get_project_context`（件数の上限は 6.2）、`search`（返す単位は 3.5）
 - カーソル方式は採らない。並び順が id の昇順で固定のため `offset` でずれず、任意のページに飛べて総件数も1回で得られる形の方が、画面の作りが単純になる
@@ -1322,7 +1322,7 @@ Web UI 専用の経路（1章）。ログインのセッションだけを受け
 
 ### 7.6 応答の形
 
-- 応答は常に JSON。1件を返す操作はリソースそのもの、一覧は `{ items, total }`（7.4）
+- 応答は常に JSON。1件を返す操作はリソースそのもの、一覧の基本は `{ items, total }`（7.4）。`list_tasks` だけは `statusCounts` も返す（8.2）
 - JSON の項目名はキャメルケース（`acceptanceCriteria`・`updatedAt`）にする。MCP のツールの入力・結果、Activity の before / after も同じ。Drizzle の TypeScript 側・zod のスキーマ・Hono RPC の型とそのまま一致し、境界で名前を変換する層が要らないため。REST API と MCP は同じ入力のスキーマを使う（4.7）ため、両方が同じ書き方になる
 - 何も返さない操作（ログアウト等）も `204` ではなく `200` と JSON で返す。Hono RPC の型と TanStack Query の扱いを1つに揃えるため
 - エラーは `{ error: { type, message } }` の形にする。`type` は 4.6 のエラーの種類と1対1に対応する
@@ -1341,3 +1341,149 @@ Web UI 専用の経路（1章）。ログインのセッションだけを受け
 - 「操作できない」と「競合」はどちらも 409 のため、`type` で見分ける（4.6 の「競合と分かる印」）。Web UI は `conflict` のときだけ読み直して再実行を促す
 - `message` は、人間が読んで次に何をすればよいか分かる文にする（4.6）。`internal` のときは詳細を入れず、ログに残す
 - 経路の層の `zValidator` の既定の 400 の応答は使わず、この形に揃える（4.7）
+
+---
+
+## 8. Web UI
+
+### 8.1 画面とルーティング
+
+Web UI は、リソースの一覧・詳細・作成に URL を持たせる。項目の編集は詳細画面の中で行い、編集だけの URL は持たない。URL を持たせることで、再読み込み・ブラウザの戻る／進む・詳細画面への直接のリンクで同じ場所を復元できるようにする。
+
+| パス | 画面 |
+|---|---|
+| `/login` | ログイン |
+| `/inbox` | Inbox Item の一覧と取り込み |
+| `/inbox/:id` | Inbox Item の詳細・編集・変換・archive・Activity |
+| `/projects` | Project の一覧 |
+| `/projects/new` | Project の作成 |
+| `/projects/:id/overview` | Project の概要・instructions・関連リポジトリと操作 |
+| `/projects/:id/tasks` | Project に属する Task |
+| `/projects/:id/documents` | Project が参照する Document |
+| `/projects/:id/activity` | Project の Activity |
+| `/tasks` | 全 Project を横断する Task の一覧 |
+| `/tasks/new` | Task の作成 |
+| `/tasks/:id` | Task の詳細・コメント・Activityと操作 |
+| `/documents` | Document の一覧 |
+| `/documents/new` | Document の作成 |
+| `/documents/:id` | Document の本文・タグ・参照元・Activityと操作 |
+| `/search` | Task・Document の検索 |
+| `/settings/agents` | agent Actor の一覧 |
+| `/settings/agents/new` | agent Actor の作成と最初の権限設定 |
+| `/settings/agents/:id` | agent Actor の権限・トークン・Activity |
+
+- `/` は `/tasks`、`/projects/:id` は `/projects/:id/overview`、`/settings` は `/settings/agents` へ移す
+- Project 詳細だけは、共通の Project 見出しと操作を残して Overview / Tasks / Documents / Activity を子ルートで切り替える。どのタブを開いているかを URL で復元するため
+- Task 詳細は、本文・親子・参照 Document・コメント・Activityを1画面に置く。Project のような子ルートには分けない
+- 短い確認や入力だけで終わる操作はダイアログで行う。ただし、Task のコメントと todo へ戻す操作は8.3のとおり詳細画面内で行う
+- ログインしていなければ `/login` へ移し、ログイン後は元の URL があればそこへ、なければ `/tasks` へ移す
+
+### 8.2 Task の一覧
+
+#### 状態の絞り込みと件数
+
+状態は件数付きのフィルターチップで常に全種類を表示し、複数を選べるようにする。
+
+```
+[Todo 12] [進行中 3] [Blocked 2] [Review 4] [Done 38] [Cancelled 6]
+```
+
+- 既定は todo / in_progress / blocked / review を選び、done / cancelled は選ばない（要件定義書 9.2）
+- done / cancelled が未選択でも、その件数は表示する
+- Project・担当者等のほかの絞り込みは件数にも反映し、状態の絞り込みだけを無視して全状態を数える
+- `list_tasks` の `total` は選択した状態を含むすべての絞り込み後・ページング前の件数、`statusCounts` は上の規則で数えた状態別件数とする
+
+`list_tasks` の結果は、通常の一覧の形（7.4）に `statusCounts` を加える。
+
+```json
+{
+  "items": [],
+  "total": 21,
+  "statusCounts": {
+    "todo": 12,
+    "inProgress": 3,
+    "blocked": 2,
+    "review": 4,
+    "done": 38,
+    "cancelled": 6
+  }
+}
+```
+
+この結果は REST API と MCP で共有する。MCP には状態別件数が必須ではないが、6個の数値であり、実際にコンテキスト量が問題になったときに分離を検討する。
+
+#### 一覧のTaskに加える情報
+
+`list_tasks` の各 Task には、ページングや状態の絞り込みに左右されず一覧を描画するため、次の派生情報を加える。いずれも REST API と MCP で共有する。
+
+| 項目 | 値 | 表示 |
+|---|---|---|
+| `allChildrenFinished` | 直接の子 Task が1件以上あり、そのすべてが done / cancelled なら `true`。子がない、または終わっていない子があれば `false` | `true` で親が todo / in_progress / blocked のときだけ `✓ 子Task完了` |
+| `returnedFrom` | 最後の状態変更が blocked → todo なら `blocked`、review → todo なら `review`、それ以外は `null` | `blocked` は `回答済み`、`review` は `差し戻し済み` を Todo の横に表示 |
+
+- `allChildrenFinished` は直接の子だけで判定する。子 Task 自身が、その子をすべて終えないと review / done になれないため、直接の子がすべて終わっていれば配下も終わっている
+- `returnedFrom` は Activity の最後の状態変更の before / after から求め、画面文言ではなく戻る前の状態を返す
+- `allChildrenFinished` と `returnedFrom` は、MCP でも親 Task が次へ進めるか、todo になった経緯は何かを判断する材料になる
+- `✓ 子Task完了`、`回答済み`、`差し戻し済み` は文字を伴うバッジにし、色だけで区別しない
+
+#### 最後に変更された日時
+
+todo / in_progress / blocked / review の Task は、一覧に `最終更新 3日前` のような相対時間を表示する。期限や異常を表す警告ではなく、Task 本体の `updated_at` が古いという事実だけを示す。
+
+- 1分未満は `たった今`、1時間未満は分、24時間未満は時間、それ以降は日を単位にする
+- 画面を開いている間も、表示する相対時間を定期的に更新する
+- Task 詳細では状態にかかわらず、作成日時・更新日時を正確な JST の日時でも表示する
+- コメントは Task 本体の `updated_at` を変えないため、この値はセッションの heartbeat や最後の Activity の日時ではない
+- done / cancelled は既定で一覧に出ず、放置に気づく対象でもないため、一覧では相対時間を表示しない
+
+### 8.3 Task のコメントと todo へ戻す操作
+
+Task 詳細には、コメントの入力欄を初めから表示し、同じ入力をコメントだけの投稿と todo へ戻す操作で共有する。
+
+| Task の状態 | 表示する操作 |
+|---|---|
+| todo / in_progress | `コメントのみ投稿` |
+| blocked | `コメントのみ投稿`、`回答して todo に戻す` |
+| review | `コメントのみ投稿`、`差し戻す` |
+| done / cancelled | 入力欄を表示しない（読み取りだけ） |
+
+- `コメントのみ投稿` は `add_task_comment`、状態別のボタンは `return_task_to_todo` を1回だけ呼ぶ
+- `return_task_to_todo` は、コメントの追加と状態変更を同じトランザクションで行う（要件定義書 F-TSK-09）
+- 前後の空白を除いた本文が空なら、同じ入力欄を使うすべてのボタンを無効にする。入力のスキーマも空の本文を受け付けない
+- 送信中は二重送信を防ぐため、同じ入力欄のすべてのボタンを無効にする
+- コメントの投稿で暗黙に状態を変えない。状態を変えるボタンは結果が分かる文言にする
+- 成功したら Task 本体・コメント・Activity・Task 一覧の TanStack Query のキャッシュを無効化して再取得する
+
+### 8.4 Actor の表示
+
+作成者・更新者・担当者・コメント・Activity は、人物／ロボットの種別アイコンと Actor 名を組み合わせた共通の表示部品を使う。
+
+```
+[人物アイコン] オーナー
+[ロボットアイコン] Codex
+[ロボットアイコン] Claude Code
+```
+
+- human / agent はアイコンで、各 agent は Actor 名で区別する。`agent` の文字ラベルは付けない
+- 色を補助に使ってよいが、色だけで種別を区別しない
+- Activity では、Actor の表示とは別に `Web` / `MCP` の経路も文字付きで表示する
+- アイコンだけにせず、Actor 名を常に併記する
+
+### 8.5 PC とスマホの幅
+
+同じルート・データ・React コンポーネントを使い、Tailwind の `md`（768px）を主な切り替え点として配置を変える。PC用とスマホ用に機能の異なる画面を二重に作らない。
+
+| 対象 | PC | スマホ |
+|---|---|---|
+| 主なナビゲーション | 左のサイドバーに Inbox / Projects / Tasks / Documents / Settings | 下部ナビゲーションに同じ5項目 |
+| 検索 | サイドバーの上部から `/search` を開く | ヘッダーから `/search` を開く |
+| 一覧 | 1件の項目を横方向にも並べる | 1件を複数行に組み替える |
+| 状態フィルター | チップを横に並べる | チップを横スクロールできるようにする |
+| Project のタブ | 横に並べる | 横スクロールできるようにする |
+| フォーム | 関連する短い項目は2列にできる | 1列にする |
+| ダイアログ | 画面の中央 | 画面幅いっぱい |
+
+- スマホでも項目や操作をなくさない。一覧に収まらない詳細は、そのリソースの詳細画面で読めるようにする
+- 横スクロールを前提にした表は作らず、一覧の1件を縦方向に組み替える。状態のチップとProjectのタブだけは横スクロールを許す
+- hover でしか現れない操作を作らず、タップする場所は44px程度を確保する
+- グローバルナビゲーションは `AppShell` の共通部品に閉じる。実装時に実際のスマホ幅で確認し、5項目が窮屈であれば、設計書と判断記録を更新したうえでハンバーガーメニュー等へ変更できる。主要5画面へ到達できること、現在地が分かること、すべての操作を使えることは変えない
