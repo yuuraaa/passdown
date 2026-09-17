@@ -1115,6 +1115,7 @@ activities
 
 - Task・Document・Inbox Item・Project の画面では、`(entity_type, entity_id)` で引く
 - トークンの記録は、`entity_type = 'token'`、`entity_id` をトークンの id にする。agent Actor の画面（要件定義書 F-ACT-02）では、activity の起点操作が auth モジュールの公開関数でその Actor のトークンの id の一覧を読み、Actor の id とあわせて引く（4.5）
+- Task・Document・Inbox Item は作成時の Activity が必ずあり、完全削除もしないため、対象の Activity が0件なら対象も存在しないとして「見つからない」にする。Project 単位の Activity も Project 自身の作成時の記録を必ず含むため、0件なら同じ扱いにする。Actor は auth モジュールの公開関数で存在を確かめる
 
 #### project_id
 

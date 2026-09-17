@@ -1,4 +1,5 @@
 import { and, asc, count, eq, inArray, or, type SQL } from 'drizzle-orm'
+import { NotFoundError } from '../../core/errors.js'
 import { type Ctx, defineOperation } from '../../core/operation.js'
 import { getActorTokenIds } from '../auth/index.js'
 import {
@@ -41,18 +42,31 @@ export function recordActivities(ctx: Ctx, records: readonly ActivityRecord[]): 
 }
 
 function readPage(ctx: Ctx, where: SQL, page: { limit: number; offset: number }): ActivityPage {
-  return ctx.db.transaction((tx) => {
-    const items = tx
-      .select()
-      .from(activities)
-      .where(where)
-      .orderBy(asc(activities.id))
-      .limit(page.limit)
-      .offset(page.offset)
-      .all()
-    const total = tx.select({ value: count() }).from(activities).where(where).get()?.value ?? 0
-    return { items, total }
-  })
+  const items = ctx.db
+    .select()
+    .from(activities)
+    .where(where)
+    .orderBy(asc(activities.id))
+    .limit(page.limit)
+    .offset(page.offset)
+    .all()
+  const total = ctx.db.select({ value: count() }).from(activities).where(where).get()?.value ?? 0
+  return { items, total }
+}
+
+/**
+ * すべての対象は作成時の Activity を持ち、完全削除されないため、0件なら対象も存在しない。
+ * 未実装の対象モジュールのテーブルへ直接依存せずに、Activity の持ち物だけで確認する。
+ */
+function requireExistingTarget(
+  page: ActivityPage,
+  entityType: 'project' | 'task' | 'document' | 'inbox_item',
+  entityId: number,
+): ActivityPage {
+  if (page.total === 0) {
+    throw new NotFoundError(`${entityType}:${entityId} が見つかりません`)
+  }
+  return page
 }
 
 function readEntityPage(
@@ -61,10 +75,14 @@ function readEntityPage(
   entityId: number,
   page: { limit: number; offset: number },
 ): ActivityPage {
-  return readPage(
-    ctx,
-    and(eq(activities.entityType, entityType), eq(activities.entityId, entityId))!,
-    page,
+  return requireExistingTarget(
+    readPage(
+      ctx,
+      and(eq(activities.entityType, entityType), eq(activities.entityId, entityId))!,
+      page,
+    ),
+    entityType,
+    entityId,
   )
 }
 
@@ -110,7 +128,11 @@ export const getProjectActivities = defineOperation({
   entity: 'project',
   input: projectActivitiesInput,
   run: (ctx, input): ActivityPage =>
-    readPage(ctx, eq(activities.projectId, input.projectId), input),
+    requireExistingTarget(
+      readPage(ctx, eq(activities.projectId, input.projectId), input),
+      'project',
+      input.projectId,
+    ),
 })
 
 /** agent Actor 自身と、その Actor に属する Token の Activity をまとめて読む（Web UI 専用）。 */

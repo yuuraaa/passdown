@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { NotFoundError } from '../../core/errors.js'
 import { createTestDatabase } from '../../testing/db.js'
 import { ctxFor, insertActor, insertProject, insertToken } from '../../testing/fixtures.js'
 import {
@@ -164,6 +165,6 @@ describe('Activity の記録と取得', () => {
         },
       ]),
     ).toThrow()
-    expect(getTaskActivities(ctx, { taskId: 1 }).total).toBe(0)
+    expect(() => getTaskActivities(ctx, { taskId: 1 })).toThrow(NotFoundError)
   })
 })
