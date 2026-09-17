@@ -96,21 +96,25 @@ export const activityPageInput = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 })
 
-export const entityActivitiesInput = activityPageInput.extend({
-  entityType: z.enum(entityTypes),
-  entityId: z.number().int().positive(),
+export const taskActivitiesInput = activityPageInput.extend({
+  taskId: z.number().int().positive(),
 })
-export type EntityActivitiesInput = z.input<typeof entityActivitiesInput>
+
+export const documentActivitiesInput = activityPageInput.extend({
+  documentId: z.number().int().positive(),
+})
+
+export const inboxItemActivitiesInput = activityPageInput.extend({
+  inboxItemId: z.number().int().positive(),
+})
 
 export const projectActivitiesInput = activityPageInput.extend({
   projectId: z.number().int().positive(),
 })
-export type ProjectActivitiesInput = z.input<typeof projectActivitiesInput>
 
 export const actorActivitiesInput = activityPageInput.extend({
   actorId: z.number().int().positive(),
 })
-export type ActorActivitiesInput = z.input<typeof actorActivitiesInput>
 
 /**
  * 他の行を指す id の入力。REST API と業務ロジックは数値で受け取り、

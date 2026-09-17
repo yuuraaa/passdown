@@ -46,8 +46,10 @@ it('一覧に操作が集まっている', () => {
   expect(operations.map((op) => op.name).sort()).toEqual([
     'create_task',
     'get_actor_activities',
-    'get_entity_activities',
+    'get_document_activities',
+    'get_inbox_item_activities',
     'get_project_activities',
+    'get_task_activities',
     'start_task',
   ])
 })

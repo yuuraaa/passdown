@@ -4,8 +4,10 @@ import { getActorTokenIds } from '../auth/index.js'
 import {
   activityRecordInput,
   actorActivitiesInput,
-  entityActivitiesInput,
+  documentActivitiesInput,
+  inboxItemActivitiesInput,
   projectActivitiesInput,
+  taskActivitiesInput,
   type ActivityRecordInput,
 } from './inputs.js'
 import { activities } from './schema.js'
@@ -53,21 +55,50 @@ function readPage(ctx: Ctx, where: SQL, page: { limit: number; offset: number })
   })
 }
 
-/** Task・Document・Inbox Item など、対象そのものの Activity を読む（Web UI 専用）。 */
-export const getEntityActivities = defineOperation({
-  name: 'get_entity_activities',
+function readEntityPage(
+  ctx: Ctx,
+  entityType: 'task' | 'document' | 'inbox_item',
+  entityId: number,
+  page: { limit: number; offset: number },
+): ActivityPage {
+  return readPage(
+    ctx,
+    and(eq(activities.entityType, entityType), eq(activities.entityId, entityId))!,
+    page,
+  )
+}
+
+/** Task の Activity を読む（Web UI 専用）。 */
+export const getTaskActivities = defineOperation({
+  name: 'get_task_activities',
   routes: ['web'],
   requires: [],
   returns: [],
-  // Web 専用なので MCP の id 変換には使われない。現在の公開経路の対象を宣言する。
   entity: 'task',
-  input: entityActivitiesInput,
-  run: (ctx, input): ActivityPage =>
-    readPage(
-      ctx,
-      and(eq(activities.entityType, input.entityType), eq(activities.entityId, input.entityId))!,
-      input,
-    ),
+  input: taskActivitiesInput,
+  run: (ctx, input): ActivityPage => readEntityPage(ctx, 'task', input.taskId, input),
+})
+
+/** Document の Activity を読む（Web UI 専用）。 */
+export const getDocumentActivities = defineOperation({
+  name: 'get_document_activities',
+  routes: ['web'],
+  requires: [],
+  returns: [],
+  entity: 'document',
+  input: documentActivitiesInput,
+  run: (ctx, input): ActivityPage => readEntityPage(ctx, 'document', input.documentId, input),
+})
+
+/** Inbox Item の Activity を読む（Web UI 専用）。変換先の付加は Inbox モジュールが行う。 */
+export const getInboxItemActivities = defineOperation({
+  name: 'get_inbox_item_activities',
+  routes: ['web'],
+  requires: [],
+  returns: [],
+  entity: 'inbox_item',
+  input: inboxItemActivitiesInput,
+  run: (ctx, input): ActivityPage => readEntityPage(ctx, 'inbox_item', input.inboxItemId, input),
 })
 
 /** Project 画面用に、その Project 自身と所属 Task の Activity を読む（Web UI 専用）。 */

@@ -123,6 +123,15 @@ describe('Activity', () => {
     const res = await app.request('/api/tasks/1/activities')
     expect(res.status).toBe(401)
   })
+
+  it.each(['/api/documents/1/activities', '/api/inbox-items/1/activities'])(
+    '%s を Web UI 専用ルートとして公開する',
+    async (path) => {
+      const res = await app.request(path, { headers: { Cookie: cookie } })
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({ items: [], total: 0 })
+    },
+  )
 })
 
 describe('エラーの応答（設計書 7.6）', () => {

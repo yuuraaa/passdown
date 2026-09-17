@@ -3,7 +3,7 @@ import { createTestDatabase } from '../../testing/db.js'
 import { ctxFor, insertActor, insertProject, insertToken } from '../../testing/fixtures.js'
 import {
   getActorActivities,
-  getEntityActivities,
+  getTaskActivities,
   getProjectActivities,
   recordActivities,
 } from './operations.js'
@@ -25,7 +25,7 @@ describe('Activity の記録と取得', () => {
       },
     ])
 
-    expect(getEntityActivities(ctx, { entityType: 'task', entityId: 10 }).items).toEqual([
+    expect(getTaskActivities(ctx, { taskId: 10 }).items).toEqual([
       expect.objectContaining({
         eventType: 'task.blocked',
         actorId: actor.id,
@@ -52,9 +52,8 @@ describe('Activity の記録と取得', () => {
       })),
     )
 
-    const page = getEntityActivities(ctx, {
-      entityType: 'task',
-      entityId: 20,
+    const page = getTaskActivities(ctx, {
+      taskId: 20,
       limit: 1,
       offset: 1,
     })
@@ -165,6 +164,6 @@ describe('Activity の記録と取得', () => {
         },
       ]),
     ).toThrow()
-    expect(getEntityActivities(ctx, { entityType: 'task', entityId: 1 }).total).toBe(0)
+    expect(getTaskActivities(ctx, { taskId: 1 }).total).toBe(0)
   })
 })

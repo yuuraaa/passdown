@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 import {
   activityPageInput,
   getActorActivities,
+  getDocumentActivities,
+  getInboxItemActivities,
   getProjectActivities,
 } from '../modules/activity/index.js'
 import { type ApiEnv, type RouteDeps, webCtx } from './context.js'
@@ -37,6 +39,42 @@ export function projectActivityRoutes(deps: RouteDeps) {
       c.json(
         getActivities(webCtx(deps, c), {
           projectId: c.req.valid('param').id,
+          ...c.req.valid('query'),
+        }),
+        200,
+      ),
+  )
+}
+
+export function documentActivityRoutes(deps: RouteDeps) {
+  const getActivities = expose(getDocumentActivities)
+
+  return new Hono<ApiEnv>().get(
+    '/:id/activities',
+    zValidator('param', idParam),
+    zValidator('query', activityPageInput),
+    (c) =>
+      c.json(
+        getActivities(webCtx(deps, c), {
+          documentId: c.req.valid('param').id,
+          ...c.req.valid('query'),
+        }),
+        200,
+      ),
+  )
+}
+
+export function inboxItemActivityRoutes(deps: RouteDeps) {
+  const getActivities = expose(getInboxItemActivities)
+
+  return new Hono<ApiEnv>().get(
+    '/:id/activities',
+    zValidator('param', idParam),
+    zValidator('query', activityPageInput),
+    (c) =>
+      c.json(
+        getActivities(webCtx(deps, c), {
+          inboxItemId: c.req.valid('param').id,
           ...c.req.valid('query'),
         }),
         200,
