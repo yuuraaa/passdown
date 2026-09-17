@@ -4,12 +4,14 @@ import { hc } from 'hono/client'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '../app.js'
 import { ConflictError } from '../core/errors.js'
+import type { Actor } from '../core/operation.js'
 import { formatDatetime } from '../core/time.js'
 import type { Database } from '../db/connection.js'
+import { recordActivities } from '../modules/activity/index.js'
 import { activities } from '../modules/activity/schema.js'
 import { sessions } from '../modules/auth/schema.js'
 import { createTestDatabase } from '../testing/db.js'
-import { FIXED_NOW, insertActor, insertSession, insertToken } from '../testing/fixtures.js'
+import { ctxFor, FIXED_NOW, insertActor, insertSession, insertToken } from '../testing/fixtures.js'
 import type { ApiType } from './app.js'
 import { handleError } from './errors.js'
 
@@ -18,11 +20,12 @@ const DAY = 86_400_000
 let database: Database
 let app: ReturnType<typeof createApp>
 let cookie: string
+let owner: Actor
 
 beforeEach(async () => {
   database = await createTestDatabase()
   app = createApp({ db: database.db, now: () => FIXED_NOW, mcpAllowedHosts: ['localhost'] })
-  const owner = insertActor(database, { actorType: 'human' })
+  owner = insertActor(database, { actorType: 'human' })
   cookie = `passdown_session=${insertSession(database, owner, new Date(FIXED_NOW.getTime() + 13 * DAY))}`
 })
 
@@ -100,6 +103,63 @@ describe('Task', () => {
 
     const sources = database.db.select({ source: activities.source }).from(activities).all()
     expect(sources).toEqual([{ source: 'web' }, { source: 'web' }])
+  })
+})
+
+describe('Activity', () => {
+  it('ログインした人間が Task の Activity を取得できる', async () => {
+    const created = await client().tasks.$post({ json: { title: '履歴を確認する Task' } })
+    const task = await created.json()
+
+    const res = await app.request(`/api/tasks/${task.id}/activities?limit=1&offset=0`, {
+      headers: { Cookie: cookie },
+    })
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({
+      total: 1,
+      items: [{ eventType: 'task.created', entityId: task.id, source: 'web' }],
+    })
+  })
+
+  it('Activity の取得にもログインが必要', async () => {
+    const res = await app.request('/api/tasks/1/activities')
+    expect(res.status).toBe(401)
+  })
+
+  it.each([
+    ['/api/documents/1/activities', 'document.created', 'document'],
+    ['/api/inbox-items/1/activities', 'inbox_item.captured', 'inbox_item'],
+  ] as const)('%s を Web UI 専用ルートとして公開する', async (path, eventType, entityType) => {
+    recordActivities(ctxFor(database, owner), [
+      {
+        eventType,
+        entityType,
+        entityId: 1,
+        projectId: null,
+        before: {},
+        after: {},
+      },
+    ])
+
+    const res = await app.request(path, { headers: { Cookie: cookie } })
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({
+      total: 1,
+      items: [{ eventType, entityType, entityId: 1 }],
+    })
+  })
+
+  it.each([
+    '/api/actors/999/activities',
+    '/api/projects/999/activities',
+    '/api/tasks/999/activities',
+    '/api/documents/999/activities',
+    '/api/inbox-items/999/activities',
+  ])('存在しない対象の %s は 404', async (path) => {
+    const res = await app.request(path, { headers: { Cookie: cookie } })
+    expect(res.status).toBe(404)
+    expect((await errorOf(res)).type).toBe('not_found')
   })
 })
 

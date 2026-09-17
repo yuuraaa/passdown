@@ -1,4 +1,10 @@
 import { Hono } from 'hono'
+import {
+  actorActivityRoutes,
+  documentActivityRoutes,
+  inboxItemActivityRoutes,
+  projectActivityRoutes,
+} from './activities.js'
 import { sessionAuth } from './auth.js'
 import type { ApiEnv, RouteDeps } from './context.js'
 import { handleError } from './errors.js'
@@ -9,6 +15,10 @@ export function createApi(deps: RouteDeps) {
   return new Hono<ApiEnv>()
     .onError(handleError)
     .use(sessionAuth(deps))
+    .route('/actors', actorActivityRoutes(deps))
+    .route('/documents', documentActivityRoutes(deps))
+    .route('/inbox-items', inboxItemActivityRoutes(deps))
+    .route('/projects', projectActivityRoutes(deps))
     .route('/tasks', taskRoutes(deps))
 }
 

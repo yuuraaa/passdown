@@ -73,3 +73,20 @@ export function assertActorExists(ctx: Ctx, actorId: number): void {
     }
   })
 }
+
+/** Actor の Activity を引くため、その Actor に属する Token の id をまとめて返す。 */
+export function getActorTokenIds(ctx: Ctx, actorId: number): number[] {
+  return ctx.db.transaction((tx) => {
+    const actor = tx.select({ id: actors.id }).from(actors).where(eq(actors.id, actorId)).get()
+    if (!actor) {
+      throw new NotFoundError(`actor:${actorId} が見つかりません`)
+    }
+    return tx
+      .select({ id: tokens.id })
+      .from(tokens)
+      .where(eq(tokens.actorId, actorId))
+      .orderBy(tokens.id)
+      .all()
+      .map((token) => token.id)
+  })
+}

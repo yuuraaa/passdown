@@ -8,15 +8,15 @@ export const activities = sqliteTable(
   'activities',
   {
     id: integer().primaryKey({ autoIncrement: true }),
-    eventType: text().notNull(),
-    entityType: text().notNull(),
+    eventType: text({ enum: eventTypes }).notNull(),
+    entityType: text({ enum: entityTypes }).notNull(),
     // 対象のテーブルが種類ごとに違うため、外部キーは張らない（設計書 5.9）
     entityId: integer().notNull(),
     projectId: integer().references(() => projects.id),
     actorId: integer()
       .notNull()
       .references(() => actors.id),
-    source: text().notNull(),
+    source: text({ enum: sources }).notNull(),
     before: text({ mode: 'json' }).$type<Record<string, unknown>>().notNull().default({}),
     after: text({ mode: 'json' }).$type<Record<string, unknown>>().notNull().default({}),
     occurredAt: datetime().notNull(),
