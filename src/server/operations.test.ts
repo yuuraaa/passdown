@@ -43,17 +43,19 @@ beforeEach(async () => {
 })
 
 it('一覧に操作が集まっている', () => {
-  expect(operations.map((op) => op.name).sort()).toEqual(['create_task', 'start_task'])
+  expect(operations.map((op) => op.name).sort()).toEqual([
+    'create_task',
+    'get_actor_activities',
+    'get_entity_activities',
+    'get_project_activities',
+    'start_task',
+  ])
 })
 
 describe.each(table)('%s', (_name, op) => {
-  it('用意した入力で成功し、Activity が記録される', () => {
+  it('用意した入力で成功し、変更する操作なら Activity が記録される', () => {
     const input = scenarioOf(op).arrange(h)
-    const before = snapshotTables(database)
-
     expectRecorded(database, () => op(h.ownerCtx, input))
-
-    expect(changedTables(before, snapshotTables(database))).toContain('activities')
   })
 
   it.each(op.requires.map((p) => [`${p[0]} の ${p[1]}`, p] as const))(

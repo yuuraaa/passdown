@@ -1,14 +1,12 @@
 import { and, asc, count, eq, inArray, or, type SQL } from 'drizzle-orm'
-import type { Ctx } from '../../core/operation.js'
+import { type Ctx, defineOperation } from '../../core/operation.js'
+import { getActorTokenIds } from '../auth/index.js'
 import {
   activityRecordInput,
   actorActivitiesInput,
   entityActivitiesInput,
   projectActivitiesInput,
-  type ActorActivitiesInput,
   type ActivityRecordInput,
-  type EntityActivitiesInput,
-  type ProjectActivitiesInput,
 } from './inputs.js'
 import { activities } from './schema.js'
 
@@ -55,32 +53,53 @@ function readPage(ctx: Ctx, where: SQL, page: { limit: number; offset: number })
   })
 }
 
-/** Task・Document・Inbox Item・Project など、対象そのものの Activity を読む。 */
-export function getEntityActivities(ctx: Ctx, input: EntityActivitiesInput): ActivityPage {
-  const parsed = entityActivitiesInput.parse(input)
-  return readPage(
-    ctx,
-    and(eq(activities.entityType, parsed.entityType), eq(activities.entityId, parsed.entityId))!,
-    parsed,
-  )
-}
+/** Task・Document・Inbox Item など、対象そのものの Activity を読む（Web UI 専用）。 */
+export const getEntityActivities = defineOperation({
+  name: 'get_entity_activities',
+  routes: ['web'],
+  requires: [],
+  returns: [],
+  // Web 専用なので MCP の id 変換には使われない。現在の公開経路の対象を宣言する。
+  entity: 'task',
+  input: entityActivitiesInput,
+  run: (ctx, input): ActivityPage =>
+    readPage(
+      ctx,
+      and(eq(activities.entityType, input.entityType), eq(activities.entityId, input.entityId))!,
+      input,
+    ),
+})
 
-/** Project 画面用に、その Project 自身と所属 Task の Activity を読む。 */
-export function getProjectActivities(ctx: Ctx, input: ProjectActivitiesInput): ActivityPage {
-  const parsed = projectActivitiesInput.parse(input)
-  return readPage(ctx, eq(activities.projectId, parsed.projectId), parsed)
-}
+/** Project 画面用に、その Project 自身と所属 Task の Activity を読む（Web UI 専用）。 */
+export const getProjectActivities = defineOperation({
+  name: 'get_project_activities',
+  routes: ['web'],
+  requires: [],
+  returns: [],
+  entity: 'project',
+  input: projectActivitiesInput,
+  run: (ctx, input): ActivityPage =>
+    readPage(ctx, eq(activities.projectId, input.projectId), input),
+})
 
-/** agent Actor 自身と、その Actor に属する Token の Activity をまとめて読む。 */
-export function getActorActivities(ctx: Ctx, input: ActorActivitiesInput): ActivityPage {
-  const parsed = actorActivitiesInput.parse(input)
-  const actor = and(eq(activities.entityType, 'actor'), eq(activities.entityId, parsed.actorId))!
-  const where =
-    parsed.tokenIds.length === 0
-      ? actor
-      : or(
-          actor,
-          and(eq(activities.entityType, 'token'), inArray(activities.entityId, parsed.tokenIds)),
-        )!
-  return readPage(ctx, where, parsed)
-}
+/** agent Actor 自身と、その Actor に属する Token の Activity をまとめて読む（Web UI 専用）。 */
+export const getActorActivities = defineOperation({
+  name: 'get_actor_activities',
+  routes: ['web'],
+  requires: [],
+  returns: [],
+  entity: 'actor',
+  input: actorActivitiesInput,
+  run: (ctx, input): ActivityPage => {
+    const tokenIds = getActorTokenIds(ctx, input.actorId)
+    const actor = and(eq(activities.entityType, 'actor'), eq(activities.entityId, input.actorId))!
+    const where =
+      tokenIds.length === 0
+        ? actor
+        : or(
+            actor,
+            and(eq(activities.entityType, 'token'), inArray(activities.entityId, tokenIds)),
+          )!
+    return readPage(ctx, where, input)
+  },
+})

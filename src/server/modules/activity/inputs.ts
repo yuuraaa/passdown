@@ -87,7 +87,8 @@ export const activityRecordInput = z
     }
   })
 
-export type ActivityRecordInput = z.input<typeof activityRecordInput>
+/** 他モジュールへ公開する記録型。before / after は省略不可にする。 */
+export type ActivityRecordInput = z.output<typeof activityRecordInput>
 
 /** Activity の一覧に共通するページング。足した順（id 昇順）で返す（設計書 4.10・7.4） */
 export const activityPageInput = z.object({
@@ -106,10 +107,8 @@ export const projectActivitiesInput = activityPageInput.extend({
 })
 export type ProjectActivitiesInput = z.input<typeof projectActivitiesInput>
 
-/** auth モジュールが Actor に属する Token の id を解決してから渡す（設計書 5.9） */
 export const actorActivitiesInput = activityPageInput.extend({
   actorId: z.number().int().positive(),
-  tokenIds: z.array(z.number().int().positive()).default([]),
 })
 export type ActorActivitiesInput = z.input<typeof actorActivitiesInput>
 

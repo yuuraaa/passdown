@@ -103,6 +103,28 @@ describe('Task', () => {
   })
 })
 
+describe('Activity', () => {
+  it('ログインした人間が Task の Activity を取得できる', async () => {
+    const created = await client().tasks.$post({ json: { title: '履歴を確認する Task' } })
+    const task = await created.json()
+
+    const res = await app.request(`/api/tasks/${task.id}/activities?limit=1&offset=0`, {
+      headers: { Cookie: cookie },
+    })
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({
+      total: 1,
+      items: [{ eventType: 'task.created', entityId: task.id, source: 'web' }],
+    })
+  })
+
+  it('Activity の取得にもログインが必要', async () => {
+    const res = await app.request('/api/tasks/1/activities')
+    expect(res.status).toBe(401)
+  })
+})
+
 describe('エラーの応答（設計書 7.6）', () => {
   it('入力が不正なら 400 invalid_input', async () => {
     const res = await client().tasks.$post({ json: { title: '' } })

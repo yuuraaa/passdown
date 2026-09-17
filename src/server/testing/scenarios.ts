@@ -25,6 +25,15 @@ export type Scenario = {
  * 操作を足したらここにも足す。足し忘れると表駆動のテストが失敗する。
  */
 export const scenarios: Record<string, Scenario> = {
+  get_entity_activities: {
+    arrange: () => ({ entityType: 'task', entityId: 1 }),
+  },
+  get_project_activities: {
+    arrange: () => ({ projectId: 1 }),
+  },
+  get_actor_activities: {
+    arrange: ({ owner }) => ({ actorId: owner.id }),
+  },
   create_task: {
     arrange: () => ({ title: 'テストの Task' }),
   },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createTestDatabase } from '../../testing/db.js'
-import { ctxFor, insertActor, insertProject } from '../../testing/fixtures.js'
+import { ctxFor, insertActor, insertProject, insertToken } from '../../testing/fixtures.js'
 import {
   getActorActivities,
   getEntityActivities,
@@ -99,14 +99,18 @@ describe('Activity の記録と取得', () => {
     expect(page.items.map((item) => item.entityType)).toEqual(['project', 'task'])
   })
 
-  it('Actor 自身と指定された Token の記録だけをまとめて返す', async () => {
+  it('Actor 自身と、その Actor に属する Token の記録だけをまとめて返す', async () => {
     const database = await createTestDatabase()
     const ctx = ctxFor(database, insertActor(database))
+    const target = insertActor(database)
+    insertToken(database, target)
+    const other = insertActor(database)
+    insertToken(database, other)
     recordActivities(ctx, [
       {
         eventType: 'actor.created',
         entityType: 'actor',
-        entityId: 10,
+        entityId: target.id,
         projectId: null,
         before: {},
         after: { name: 'agent' },
@@ -114,26 +118,26 @@ describe('Activity の記録と取得', () => {
       {
         eventType: 'token.issued',
         entityType: 'token',
-        entityId: 20,
+        entityId: 1,
         projectId: null,
         before: {},
-        after: { actorId: 10 },
+        after: { actorId: target.id },
       },
       {
         eventType: 'token.issued',
         entityType: 'token',
-        entityId: 21,
+        entityId: 2,
         projectId: null,
         before: {},
-        after: { actorId: 11 },
+        after: { actorId: other.id },
       },
     ])
 
-    const page = getActorActivities(ctx, { actorId: 10, tokenIds: [20] })
+    const page = getActorActivities(ctx, { actorId: target.id })
     expect(page.total).toBe(2)
     expect(page.items.map((item) => [item.entityType, item.entityId])).toEqual([
-      ['actor', 10],
-      ['token', 20],
+      ['actor', target.id],
+      ['token', 1],
     ])
   })
 

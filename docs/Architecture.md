@@ -1114,7 +1114,7 @@ activities
 #### 対象ごとの引き方
 
 - Task・Document・Inbox Item・Project の画面では、`(entity_type, entity_id)` で引く
-- トークンの記録は、`entity_type = 'token'`、`entity_id` をトークンの id にする。agent Actor の画面（要件定義書 F-ACT-02）では、auth モジュールがその Actor のトークンの id の一覧を読み、activity の関数に Actor の id とトークンの id の一覧を渡して引く（4.5）
+- トークンの記録は、`entity_type = 'token'`、`entity_id` をトークンの id にする。agent Actor の画面（要件定義書 F-ACT-02）では、activity の起点操作が auth モジュールの公開関数でその Actor のトークンの id の一覧を読み、Actor の id とあわせて引く（4.5）
 
 #### project_id
 

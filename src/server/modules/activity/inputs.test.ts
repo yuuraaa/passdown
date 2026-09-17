@@ -1,7 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
+import type { ActivityRecord } from './operations.js'
 import { activityPageInput, activityRecordInput } from './inputs.js'
 
 describe('activityRecordInput', () => {
+  it('公開する記録型では before と after が必須', () => {
+    expectTypeOf<ActivityRecord>().toMatchTypeOf<{ before: unknown; after: unknown }>()
+  })
+
   it('対象と eventType、projectId の整合した入力を受け付ける', () => {
     expect(
       activityRecordInput.parse({
