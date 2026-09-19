@@ -1,3 +1,4 @@
+import { NotAllowedError } from '../../core/errors.js'
 import { formatDatetime } from '../../core/time.js'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -20,4 +21,26 @@ export function planSessionExtension(expiresAt: string, now: string): string | n
     return null
   }
   return formatDatetime(new Date(Date.parse(now) + SESSION_TTL_MS))
+}
+
+/** Token は agent Actor にだけ発行できる（設計書 5.3）。 */
+export function checkAgentActor(actor: { id: number; actorType: 'human' | 'agent' }): void {
+  if (actor.actorType !== 'agent') {
+    throw new NotAllowedError(
+      `actor:${actor.id} は human のため、agent Actor にだけ許可された操作はできません`,
+    )
+  }
+}
+
+export function checkCanIssueToken(actor: { id: number; actorType: 'human' | 'agent' }): void {
+  checkAgentActor(actor)
+}
+
+export function checkCanChangeAgentPermissions(actor: {
+  id: number
+  actorType: 'human' | 'agent'
+}): void {
+  if (actor.actorType !== 'agent') {
+    throw new NotAllowedError(`actor:${actor.id} は human のため、権限を変更できません`)
+  }
 }

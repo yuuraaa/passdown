@@ -2,7 +2,8 @@ import type { Actor, Ctx, Resource } from '../core/operation.js'
 import type { Database } from '../db/connection.js'
 import { recordActivities } from '../modules/activity/index.js'
 import { createTask } from '../modules/task/index.js'
-import { ctxFor, insertActor, insertProject } from './fixtures.js'
+import { ctxFor, insertActor, insertProject, insertToken } from './fixtures.js'
+import { tokens } from '../modules/auth/schema.js'
 
 export type Harness = {
   database: Database
@@ -26,6 +27,33 @@ export type Scenario = {
  * 操作を足したらここにも足す。足し忘れると表駆動のテストが失敗する。
  */
 export const scenarios: Record<string, Scenario> = {
+  list_actors: {
+    arrange: () => ({}),
+  },
+  create_agent_actor: {
+    arrange: () => ({
+      name: '実装エージェント',
+      permissions: { project: 'read', task: 'readwrite', document: 'read', inbox: 'none' },
+    }),
+  },
+  update_agent_permissions: {
+    arrange: ({ database }) => ({
+      id: insertActor(database).id,
+      permissions: { project: 'read', task: 'read', document: 'none', inbox: 'readwrite' },
+    }),
+  },
+  list_actor_tokens: {
+    arrange: ({ database }) => ({ id: insertActor(database).id }),
+  },
+  issue_token: {
+    arrange: ({ database }) => ({ id: insertActor(database).id }),
+  },
+  revoke_token: {
+    arrange: ({ database, owner }) => {
+      insertToken(database, owner)
+      return { id: database.db.select({ id: tokens.id }).from(tokens).get()!.id }
+    },
+  },
   get_task_activities: {
     arrange: ({ ownerCtx }) => {
       recordActivities(ownerCtx, [

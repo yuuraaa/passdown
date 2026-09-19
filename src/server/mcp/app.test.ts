@@ -128,9 +128,9 @@ describe('ツールの登録', () => {
     const full = insertToken(database, insertActor(database))
     const readOnly = insertToken(database, insertActor(database, { permissions: { task: 'read' } }))
 
-    expect(await listTools(full)).toEqual(['create_task', 'start_task'])
+    expect(await listTools(full)).toEqual(['create_task', 'list_actors', 'start_task'])
     // ツールが1つもなければ、SDK は tools の機能自体を宣言しない
-    expect((await listTools(readOnly)) ?? []).toEqual([])
+    expect((await listTools(readOnly)) ?? []).toEqual(['list_actors'])
   })
 
   it('id の入力は `<種類>:<id>` の文字列で受け取る', async () => {
