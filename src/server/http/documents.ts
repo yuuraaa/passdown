@@ -5,6 +5,7 @@ import {
   createDocumentInput,
   documentPageInput,
   getDocumentOperation,
+  getDocumentReferences,
   listDocumentTags,
   listDocuments,
   updateDocument,
@@ -17,6 +18,7 @@ import { idParam, zValidator } from './validator.js'
 export function documentRoutes(deps: RouteDeps) {
   const list = expose(listDocuments)
   const get = expose(getDocumentOperation)
+  const references = expose(getDocumentReferences)
   const create = expose(createDocument)
   const update = expose(updateDocument)
   const archive = expose(archiveDocument)
@@ -30,6 +32,9 @@ export function documentRoutes(deps: RouteDeps) {
     )
     .get('/:id', zValidator('param', idParam), (c) =>
       c.json(get(webCtx(deps, c), c.req.valid('param')), 200),
+    )
+    .get('/:id/references', zValidator('param', idParam), (c) =>
+      c.json(references(webCtx(deps, c), c.req.valid('param')), 200),
     )
     .patch(
       '/:id',
