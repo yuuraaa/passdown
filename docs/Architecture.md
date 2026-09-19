@@ -665,7 +665,8 @@ export const approveTask = defineOperation({
 
 - 権限を確認するのは起点の操作だけ。起点から呼ばれる他のモジュールの関数は確認しない
 - 起点の操作が、その操作に必要な権限をすべて `requires` に列挙する。複数のリソースにまたがる書き込み（要件定義書 F-AUTH-09）もここに書く
-  - 例: Inbox Item を Task に変換する → `[['inbox', 'readwrite'], ['task', 'readwrite']]`
+- 例: Inbox Item を Task に変換する → `[['inbox', 'readwrite'], ['task', 'readwrite']]`
+- 変換先を入力で選ぶ `convert_inbox_item` は、`requires` には共通の inbox readwrite を置き、Inbox モジュール内で選ばれた変換先（project / task / document）の readwrite を確認する。静的な `requires` だけでは、変換先ごとの最小権限を表せないため。この確認も起点操作の中で行い、`withoutPermissionCheck` を呼ぶ前に必ず済ませる
 - 起点の操作を他のモジュールから呼ぶときは、権限を確認しない呼び口を使う
 
   ```ts
