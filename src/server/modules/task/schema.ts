@@ -3,12 +3,14 @@ import {
   check,
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
 } from 'drizzle-orm/sqlite-core'
 import { datetime, inValues } from '../../core/columns.js'
 import { actors } from '../auth/schema.js'
 import { projects } from '../project/schema.js'
+import { documents } from '../document/schema.js'
 import { taskPriorities, taskStatuses } from './inputs.js'
 
 export const tasks = sqliteTable(
@@ -39,5 +41,38 @@ export const tasks = sqliteTable(
     index('tasks_parent_id_idx').on(t.parentId),
     index('tasks_project_id_idx').on(t.projectId),
     index('tasks_assignee_id_idx').on(t.assigneeId),
+  ],
+)
+
+export const taskComments = sqliteTable(
+  'task_comments',
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    taskId: integer()
+      .notNull()
+      .references(() => tasks.id),
+    body: text().notNull(),
+    createdBy: integer()
+      .notNull()
+      .references(() => actors.id),
+    createdAt: datetime().notNull(),
+  },
+  (t) => [index('task_comments_task_id_idx').on(t.taskId)],
+)
+
+export const taskDocuments = sqliteTable(
+  'task_documents',
+  {
+    taskId: integer()
+      .notNull()
+      .references(() => tasks.id),
+    documentId: integer()
+      .notNull()
+      .references(() => documents.id),
+  },
+  (t) => [
+    primaryKey({ columns: [t.taskId, t.documentId] }),
+    // Task ごとの読み取りは複合主キー、Document 側からの参照元取得はこの index を使う。
+    index('task_documents_document_id_idx').on(t.documentId),
   ],
 )

@@ -9,9 +9,11 @@ import { formatDatetime } from '../core/time.js'
 import type { Database } from '../db/connection.js'
 import { recordActivities } from '../modules/activity/index.js'
 import { activities } from '../modules/activity/schema.js'
+import { createProject, updateProject } from '../modules/project/index.js'
 import { sessions } from '../modules/auth/schema.js'
 import { humanCredentials } from '../modules/auth/schema.js'
 import { hashPassword, hashSecret } from '../modules/auth/index.js'
+import { createTask, updateTask } from '../modules/task/index.js'
 import { createTestDatabase } from '../testing/db.js'
 import { ctxFor, FIXED_NOW, insertActor, insertSession, insertToken } from '../testing/fixtures.js'
 import type { ApiType } from './app.js'
@@ -166,6 +168,176 @@ describe('Task', () => {
 
     const sources = database.db.select({ source: activities.source }).from(activities).all()
     expect(sources).toEqual([{ source: 'web' }, { source: 'web' }])
+  })
+})
+
+describe('Project', () => {
+  it('作成・詳細・更新・文脈・完了・archive を REST API で利用できる', async () => {
+    const created = await app.request('/api/projects', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '実装', description: '概要', instructions: '指示' }),
+    })
+    expect(created.status).toBe(200)
+    const project = (await created.json()) as { id: number; version: number }
+
+    const listed = await app.request('/api/projects?limit=1&offset=0', {
+      headers: { Cookie: cookie },
+    })
+    expect(await listed.json()).toMatchObject({
+      total: 1,
+      items: [{ id: project.id, name: '実装' }],
+    })
+    expect(
+      await (
+        await app.request(`/api/projects/${project.id}`, { headers: { Cookie: cookie } })
+      ).json(),
+    ).toMatchObject({ id: project.id, documents: [] })
+
+    const updated = await app.request(`/api/projects/${project.id}`, {
+      method: 'PATCH',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: '更新後',
+        description: '',
+        instructions: '',
+        repositories: [],
+        documentIds: [],
+        version: project.version,
+      }),
+    })
+    expect(updated.status).toBe(200)
+    expect(
+      await (
+        await app.request(`/api/projects/${project.id}/context`, { headers: { Cookie: cookie } })
+      ).json(),
+    ).toMatchObject({ id: project.id, taskRemaining: 0, documentRemaining: 0 })
+    expect(
+      (
+        await app.request(`/api/projects/${project.id}/complete`, {
+          method: 'POST',
+          headers: { Cookie: cookie },
+        })
+      ).status,
+    ).toBe(200)
+
+    const archived = await app.request('/api/projects', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '取りやめ' }),
+    })
+    const cancelled = (await archived.json()) as { id: number }
+    expect(
+      (
+        await app.request(`/api/projects/${cancelled.id}/archive`, {
+          method: 'POST',
+          headers: { Cookie: cookie },
+        })
+      ).status,
+    ).toBe(200)
+
+    const invalid = await app.request('/api/projects', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '' }),
+    })
+    expect(invalid.status).toBe(400)
+  })
+})
+
+describe('Document', () => {
+  it('作成・更新・archive と既存タグ一覧を REST API で利用できる', async () => {
+    const created = await app.request('/api/documents', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: '運用資料', content: '本文', tags: [' K8S '] }),
+    })
+    expect(created.status).toBe(200)
+    const document = (await created.json()) as { id: number; version: number; tags: string[] }
+    expect(document.tags).toEqual(['k8s'])
+
+    const listed = await app.request('/api/documents?limit=1&offset=0', {
+      headers: { Cookie: cookie },
+    })
+    expect(await listed.json()).toMatchObject({
+      total: 1,
+      items: [{ id: document.id, title: '運用資料' }],
+    })
+    const detail = await app.request(`/api/documents/${document.id}`, {
+      headers: { Cookie: cookie },
+    })
+    expect(await detail.json()).toMatchObject({ id: document.id, content: '本文', tags: ['k8s'] })
+
+    const task = createTask(ctxFor(database, owner), { title: '参照する Task' })
+    updateTask(ctxFor(database, owner), {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      acceptanceCriteria: task.acceptanceCriteria,
+      priority: task.priority,
+      links: task.links,
+      assigneeId: task.assigneeId,
+      parentId: task.parentId,
+      projectId: task.projectId,
+      documentIds: [document.id],
+      version: task.version,
+    })
+    const project = createProject(ctxFor(database, owner), { name: '参照する Project' })
+    updateProject(ctxFor(database, owner), {
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      instructions: project.instructions,
+      repositories: project.repositories,
+      documentIds: [document.id],
+      version: project.version,
+    })
+    const references = await app.request(`/api/documents/${document.id}/references`, {
+      headers: { Cookie: cookie },
+    })
+    expect(references.status).toBe(200)
+    expect(await references.json()).toEqual({
+      tasks: [{ id: task.id, title: task.title, status: 'todo', projectId: null }],
+      projects: [{ id: project.id, name: project.name, status: 'active' }],
+    })
+
+    const updated = await app.request(`/api/documents/${document.id}`, {
+      method: 'PATCH',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: '更新資料',
+        content: '更新本文',
+        tags: ['設計'],
+        version: document.version,
+      }),
+    })
+    expect(updated.status).toBe(200)
+
+    const tags = await app.request('/api/document-tags', { headers: { Cookie: cookie } })
+    expect(await tags.json()).toEqual(['設計'])
+
+    const archived = await app.request(`/api/documents/${document.id}/archive`, {
+      method: 'POST',
+      headers: { Cookie: cookie },
+    })
+    expect(archived.status).toBe(200)
+    expect(await archived.json()).toMatchObject({ status: 'archived', version: 3 })
+
+    const archivedReferences = await app.request(`/api/documents/${document.id}/references`, {
+      headers: { Cookie: cookie },
+    })
+    expect(await archivedReferences.json()).toMatchObject({
+      tasks: [{ id: task.id }],
+      projects: [{ id: project.id }],
+    })
+
+    const invalid = await app.request('/api/documents', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: '', tags: ['　'] }),
+    })
+    expect(invalid.status).toBe(400)
+    expect((await errorOf(invalid)).type).toBe('invalid_input')
   })
 })
 

@@ -1,2 +1,26 @@
-export { getProjectStatus } from './operations.js'
-export { type ProjectStatus, projectStatuses } from './inputs.js'
+export {
+  archiveProject,
+  completeProject,
+  createProject,
+  getProjectContext,
+  getProjectDocumentIds,
+  getProjectOperation,
+  getProjectStatus,
+  getProjectsReferencingDocument,
+  listProjects,
+  updateProject,
+  type DocumentProjectReference,
+  type Project,
+  type ProjectContext,
+  type ProjectDetail,
+} from './operations.js'
+export {
+  archiveProjectInput,
+  completeProjectInput,
+  createProjectInput,
+  getProjectInput,
+  listProjectsInput,
+  projectStatuses,
+  type ProjectStatus,
+  updateProjectInput,
+} from './inputs.js'

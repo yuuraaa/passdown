@@ -7,8 +7,24 @@ import { createTestDatabase } from '../../testing/db.js'
 import { ctxFor, insertActor, insertProject } from '../../testing/fixtures.js'
 import { changedTables, expectRecorded, snapshotTables } from '../../testing/recorded.js'
 import { activities } from '../activity/schema.js'
-import { createTask, startTask } from './operations.js'
-import { tasks } from './schema.js'
+import { createDocument } from '../document/index.js'
+import { documents } from '../document/schema.js'
+import {
+  addTaskComment,
+  blockTask,
+  cancelTask,
+  cancelUnfinishedProjectTasks,
+  createTask,
+  getTasksReferencingDocument,
+  getTaskOperation,
+  getUnfinishedProjectTasks,
+  hasUnfinishedProjectTasks,
+  requestTaskReview,
+  returnTaskToTodo,
+  startTask,
+  updateTask,
+} from './operations.js'
+import { taskComments, taskDocuments, tasks } from './schema.js'
 
 let database: Database
 let ctx: Ctx
@@ -209,5 +225,181 @@ describe('startTask', () => {
 
   it('存在しない Task は見つからない', () => {
     expectNothingWritten(() => startTask(ctx, { id: 999 }), NotFoundError)
+  })
+})
+
+describe('Task の更新・完了処理', () => {
+  const updateInput = (task: { id: number; version: number }) => ({
+    id: task.id,
+    title: '更新後',
+    description: '',
+    acceptanceCriteria: '',
+    priority: 'normal' as const,
+    links: [],
+    assigneeId: null,
+    parentId: null,
+    projectId: null,
+    documentIds: [],
+    version: task.version,
+  })
+
+  it('最上位 Task の Project 変更は全子孫へ追随し、auto_moved を記録する', () => {
+    const root = create({ title: 'root' })
+    const child = create({ title: 'child', parentId: root.id })
+    const grandchild = create({ title: 'grandchild', parentId: child.id })
+    const projectId = insertProject(database)
+
+    updateTask(ctx, { ...updateInput(root), projectId })
+
+    for (const task of [child, grandchild]) {
+      expect(readTask(task.id)).toMatchObject({ projectId })
+      expect(activitiesOf(task.id).at(-1)).toMatchObject({
+        eventType: 'task.auto_moved',
+        before: { projectId: null },
+        after: { projectId },
+      })
+    }
+  })
+
+  it('in_progress の Task を todo の親へ付けると親を自動で着手する', () => {
+    const parent = create({ title: '親' })
+    const child = create({ title: '子' })
+    start(child.id)
+
+    updateTask(ctx, { ...updateInput(readTask(child.id)!), parentId: parent.id })
+
+    expect(readTask(parent.id)).toMatchObject({ status: 'in_progress' })
+    expect(activitiesOf(parent.id).at(-1)).toMatchObject({ eventType: 'task.auto_started' })
+  })
+
+  it('Document の参照差分を保存し、追加・削除の Activity を記録する', () => {
+    const task = create({ title: 't' })
+    const first = createDocument(ctx, { title: 'first' })
+    const second = createDocument(ctx, { title: 'second' })
+    const linked = updateTask(ctx, { ...updateInput(task), documentIds: [first.id] })
+    updateTask(ctx, { ...updateInput(linked), documentIds: [second.id] })
+
+    expect(
+      database.db.select().from(taskDocuments).where(eq(taskDocuments.taskId, task.id)).all(),
+    ).toEqual([{ taskId: task.id, documentId: second.id }])
+    expect(activitiesOf(task.id).map((a) => a.eventType)).toContain('task.document_linked')
+    expect(activitiesOf(task.id).map((a) => a.eventType)).toContain('task.document_unlinked')
+  })
+
+  it('Web の詳細には archived Document を残し、MCP の詳細からは除く', () => {
+    const task = create({ title: 't' })
+    const active = createDocument(ctx, { title: 'active' })
+    const archived = createDocument(ctx, { title: 'archived' })
+    const updated = updateTask(ctx, { ...updateInput(task), documentIds: [active.id, archived.id] })
+    database.db
+      .update(documents)
+      .set({ status: 'archived' })
+      .where(eq(documents.id, archived.id))
+      .run()
+
+    expect(getTaskOperation(ctxFor(database, ctx.actor, 'web'), { id: updated.id }).documents).toHaveLength(
+      2,
+    )
+    expect(getTaskOperation(ctx, { id: updated.id }).documents).toEqual([
+      expect.objectContaining({ id: active.id, status: 'active' }),
+    ])
+  })
+
+  it('コメントだけでは version を上げず、todo 復帰ではコメントと blockedReason の消去を行う', () => {
+    const task = create({ title: 't' })
+    start(task.id)
+    const blocked = blockTask(ctx, { id: task.id, blockedReason: '確認が必要' })
+    addTaskComment(ctx, { id: task.id, body: '途中経過' })
+    expect(readTask(task.id)?.version).toBe(blocked.version)
+
+    const returned = returnTaskToTodo(ctx, { id: task.id, body: '回答です' })
+    expect(returned).toMatchObject({
+      status: 'todo',
+      blockedReason: '',
+      version: blocked.version + 1,
+    })
+    expect(
+      database.db.select().from(taskComments).where(eq(taskComments.taskId, task.id)).all(),
+    ).toHaveLength(2)
+  })
+
+  it('未完了の子があれば review を拒否し、cancel は未完了の子孫だけを連動 cancel する', () => {
+    const parent = create({ title: '親' })
+    const active = create({ title: '作業中', parentId: parent.id })
+    const finished = create({ title: '完了', parentId: parent.id })
+    start(parent.id)
+    expectNothingWritten(
+      () => requestTaskReview(ctx, { id: parent.id, result: '成果' }),
+      NotAllowedError,
+    )
+
+    database.db.update(tasks).set({ status: 'done' }).where(eq(tasks.id, finished.id)).run()
+    const cancelled = cancelTask(ctx, { id: parent.id, result: '中止理由' })
+    expect(cancelled.status).toBe('cancelled')
+    expect(readTask(active.id)).toMatchObject({
+      status: 'cancelled',
+      result: '親 Task をやめたため',
+    })
+    expect(readTask(finished.id)?.status).toBe('done')
+    expect(activitiesOf(active.id).at(-1)?.eventType).toBe('task.auto_cancelled')
+  })
+
+  it('version が古い更新は Task・参照・Activity を一切変更しない', () => {
+    const task = create({ title: 't' })
+    database.db
+      .update(tasks)
+      .set({ version: task.version + 1 })
+      .where(eq(tasks.id, task.id))
+      .run()
+    const stale = updateInput(task)
+    expectNothingWritten(() => updateTask(ctx, stale), ConflictError)
+  })
+})
+
+describe('他モジュール向け公開 API', () => {
+  it('Project の未完了 Task を優先度順に読み、完了判定に使える', () => {
+    const projectId = insertProject(database)
+    const low = create({ title: 'low', projectId, priority: 'low' })
+    const high = create({ title: 'high', projectId, priority: 'high' })
+    const done = create({ title: 'done', projectId })
+    database.db.update(tasks).set({ status: 'done' }).where(eq(tasks.id, done.id)).run()
+
+    expect(getUnfinishedProjectTasks(ctx, projectId).map((task) => task.id)).toEqual([
+      high.id,
+      low.id,
+    ])
+    expect(hasUnfinishedProjectTasks(ctx, projectId)).toBe(true)
+  })
+
+  it('Project archive 用の一括 cancel は未完了 Task だけを自動 cancel として記録する', () => {
+    const projectId = insertProject(database)
+    const open = create({ title: 'open', projectId })
+    const done = create({ title: 'done', projectId })
+    database.db.update(tasks).set({ status: 'done' }).where(eq(tasks.id, done.id)).run()
+
+    cancelUnfinishedProjectTasks(ctx, projectId)
+
+    expect(readTask(open.id)).toMatchObject({ status: 'cancelled', result: 'Project をやめたため' })
+    expect(readTask(done.id)?.status).toBe('done')
+    expect(activitiesOf(open.id).at(-1)).toMatchObject({ eventType: 'task.auto_cancelled' })
+    expect(hasUnfinishedProjectTasks(ctx, projectId)).toBe(false)
+  })
+
+  it('Document の参照元として Task を ID 順で返す', () => {
+    const first = create({ title: 'first' })
+    const second = create({ title: 'second' })
+    const document = createDocument(ctx, { title: '資料' })
+    database.db
+      .insert(taskDocuments)
+      .values([
+        { taskId: second.id, documentId: document.id },
+        { taskId: first.id, documentId: document.id },
+      ])
+      .run()
+
+    expect(getTasksReferencingDocument(ctx, document.id).map((task) => task.id)).toEqual([
+      first.id,
+      second.id,
+    ])
   })
 })

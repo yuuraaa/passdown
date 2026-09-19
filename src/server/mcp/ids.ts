@@ -78,6 +78,15 @@ export function toMcpIds(value: unknown, entity: EntityType): unknown {
       if (key === 'items') {
         return [key, toMcpIds(v, entity)]
       }
+      if (key === 'parent' || key === 'children') {
+        return [key, toMcpIds(v, 'task')]
+      }
+      if (key === 'documents') {
+        return [key, toMcpIds(v, 'document')]
+      }
+      if (key === 'tasks') {
+        return [key, toMcpIds(v, 'task')]
+      }
       return [key, v]
     }),
   )

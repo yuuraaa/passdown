@@ -43,3 +43,60 @@ export const createTaskInput = z.object({
 export const startTaskInput = z.object({
   id: entityId('task').describe('着手する Task（todo のものに限る）'),
 })
+
+const page = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+})
+
+export const listTasksInput = page.extend({
+  statuses: z
+    .array(z.enum(taskStatuses))
+    .min(1)
+    .default([...taskStatuses]),
+  projectId: entityId('project').optional(),
+  assigneeId: entityId('actor').optional(),
+})
+
+export const listActionableTasksInput = z.object({})
+export const getTaskInput = z.object({ id: entityId('task') })
+
+export const updateTaskInput = z.object({
+  id: entityId('task'),
+  title: z.string().refine(notBlank, '空にできません').describe('タイトル'),
+  description: z.string().default(''),
+  acceptanceCriteria: z.string().default(''),
+  priority: z.enum(taskPriorities),
+  links: z.array(z.string().refine(notBlank, '空にできません')),
+  assigneeId: entityId('actor').nullable(),
+  parentId: entityId('task').nullable(),
+  projectId: entityId('project').nullable(),
+  documentIds: z.array(entityId('document')).default([]),
+  version: z.number().int().positive(),
+})
+
+export const addTaskCommentInput = z.object({
+  id: entityId('task'),
+  body: z.string().refine(notBlank, '空にできません'),
+})
+
+export const blockTaskInput = z.object({
+  id: entityId('task'),
+  blockedReason: z.string().refine(notBlank, '空にできません'),
+})
+
+export const requestTaskReviewInput = z.object({
+  id: entityId('task'),
+  result: z.string().refine(notBlank, '空にできません'),
+})
+
+export const returnTaskToTodoInput = z.object({
+  id: entityId('task'),
+  body: z.string().refine(notBlank, '空にできません'),
+})
+
+export const approveTaskInput = z.object({ id: entityId('task') })
+export const cancelTaskInput = z.object({
+  id: entityId('task'),
+  result: z.string().refine(notBlank, '空にできません'),
+})
