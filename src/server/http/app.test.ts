@@ -10,6 +10,8 @@ import type { Database } from '../db/connection.js'
 import { recordActivities } from '../modules/activity/index.js'
 import { activities } from '../modules/activity/schema.js'
 import { sessions } from '../modules/auth/schema.js'
+import { humanCredentials } from '../modules/auth/schema.js'
+import { hashPassword, hashSecret } from '../modules/auth/index.js'
 import { createTestDatabase } from '../testing/db.js'
 import { ctxFor, FIXED_NOW, insertActor, insertSession, insertToken } from '../testing/fixtures.js'
 import type { ApiType } from './app.js'
@@ -42,6 +44,67 @@ async function errorOf(res: Response) {
 }
 
 describe('認証', () => {
+  it('human はログインするとセッション Cookie を受け取り、ログアウトできる', async () => {
+    const password = 'correct horse battery staple'
+    database.db
+      .insert(humanCredentials)
+      .values({
+        actorId: owner.id,
+        loginName: 'owner',
+        passwordHash: await hashPassword(password),
+      })
+      .run()
+
+    const login = await app.request('/api/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginName: 'owner', password }),
+    })
+    expect(login.status).toBe(200)
+    const setCookie = login.headers.get('set-cookie') ?? ''
+    expect(setCookie).toContain('HttpOnly')
+    expect(setCookie).not.toContain('Secure')
+    expect(setCookie).toContain('SameSite=Lax')
+    const loggedInCookie = setCookie.split(';')[0]
+    expect(
+      (await app.request('/api/session', { headers: { Cookie: loggedInCookie } })).status,
+    ).toBe(200)
+    expect(
+      (await app.request('/api/session', { method: 'DELETE', headers: { Cookie: loggedInCookie } }))
+        .status,
+    ).toBe(200)
+    expect(
+      (await app.request('/api/session', { headers: { Cookie: loggedInCookie } })).status,
+    ).toBe(401)
+  })
+
+  it('ログイン失敗はアカウントの有無を示さない', async () => {
+    const expired = insertSession(database, owner, new Date(FIXED_NOW.getTime() - 1))
+    const res = await app.request('/api/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginName: 'missing', password: 'wrong password' }),
+    })
+    expect(res.status).toBe(401)
+    expect(await errorOf(res)).toEqual({
+      type: 'unauthorized',
+      message: 'ログイン名またはパスワードが違います',
+    })
+    expect(
+      database.db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.sessionHash, hashSecret(expired)))
+        .get(),
+    ).toBeUndefined()
+  })
+
+  it('human Actor の Token 一覧は取得できない', async () => {
+    const res = await app.request(`/api/actors/${owner.id}/tokens`, { headers: { Cookie: cookie } })
+    expect(res.status).toBe(409)
+    expect(await errorOf(res)).toMatchObject({ type: 'not_allowed' })
+  })
+
   it('ログインしていなければ 401', async () => {
     const res = await client({}).tasks.$post({ json: { title: 't' } })
     expect(res.status).toBe(401)
