@@ -9,6 +9,7 @@ import {
   updateTask,
 } from '../modules/task/index.js'
 import { createDocument } from '../modules/document/index.js'
+import { captureInboxItem } from '../modules/inbox/index.js'
 import { createProject, updateProject } from '../modules/project/index.js'
 import { ctxFor, insertActor, insertProject, insertToken } from './fixtures.js'
 import { tokens } from '../modules/auth/schema.js'
@@ -147,6 +148,25 @@ export const scenarios: Record<string, Scenario> = {
       ])
       return { inboxItemId: 1 }
     },
+  },
+  list_inbox_items: { arrange: () => ({}) },
+  capture_inbox_item: { arrange: () => ({ content: 'Inbox Item' }) },
+  update_inbox_item: {
+    arrange: ({ ownerCtx }) => {
+      const item = captureInboxItem.withoutPermissionCheck(ownerCtx, { content: '更新前' })
+      return { id: item.id, content: '更新後', version: item.version }
+    },
+  },
+  convert_inbox_item: {
+    arrange: ({ ownerCtx }) => ({
+      id: captureInboxItem.withoutPermissionCheck(ownerCtx, { content: '変換する Item' }).id,
+      target: { targetType: 'task', target: { title: '変換先 Task' } },
+    }),
+  },
+  archive_inbox_item: {
+    arrange: ({ ownerCtx }) => ({
+      id: captureInboxItem.withoutPermissionCheck(ownerCtx, { content: 'archive する Item' }).id,
+    }),
   },
   get_project_activities: {
     arrange: ({ database, ownerCtx }) => {

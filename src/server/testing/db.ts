@@ -3,6 +3,7 @@ import { type Database, openDatabase } from '../db/connection.js'
 import * as activity from '../modules/activity/schema.js'
 import * as auth from '../modules/auth/schema.js'
 import * as document from '../modules/document/schema.js'
+import * as inbox from '../modules/inbox/schema.js'
 import * as project from '../modules/project/schema.js'
 import * as task from '../modules/task/schema.js'
 
@@ -25,7 +26,7 @@ function schemaStatements(): Promise<string[]> {
   statements ??= (async () => {
     const empty = await generateSQLiteDrizzleJson({}, undefined, 'snake_case')
     const current = await generateSQLiteDrizzleJson(
-      { ...activity, ...auth, ...document, ...project, ...task },
+      { ...activity, ...auth, ...document, ...inbox, ...project, ...task },
       undefined,
       'snake_case',
     )
