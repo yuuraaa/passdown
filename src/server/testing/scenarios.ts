@@ -3,6 +3,7 @@ import type { Database } from '../db/connection.js'
 import { recordActivities } from '../modules/activity/index.js'
 import { blockTask, createTask, requestTaskReview, startTask } from '../modules/task/index.js'
 import { createDocument } from '../modules/document/index.js'
+import { createProject } from '../modules/project/index.js'
 import { ctxFor, insertActor, insertProject, insertToken } from './fixtures.js'
 import { tokens } from '../modules/auth/schema.js'
 
@@ -28,6 +29,47 @@ export type Scenario = {
  * 操作を足したらここにも足す。足し忘れると表駆動のテストが失敗する。
  */
 export const scenarios: Record<string, Scenario> = {
+  list_projects: { arrange: () => ({}) },
+  get_project: {
+    arrange: ({ ownerCtx }) => ({
+      id: createProject.withoutPermissionCheck(ownerCtx, { name: 'Project' }).id,
+    }),
+    excludes: { document: (result) => (result as { documents: unknown[] }).documents.length === 0 },
+  },
+  create_project: { arrange: () => ({ name: 'Project' }) },
+  update_project: {
+    arrange: ({ ownerCtx }) => {
+      const project = createProject.withoutPermissionCheck(ownerCtx, { name: 'Project' })
+      return {
+        id: project.id,
+        name: '更新後',
+        description: '',
+        instructions: '',
+        repositories: [],
+        documentIds: [],
+        version: project.version,
+      }
+    },
+  },
+  get_project_context: {
+    arrange: ({ ownerCtx }) => ({
+      id: createProject.withoutPermissionCheck(ownerCtx, { name: 'Project' }).id,
+    }),
+    excludes: {
+      task: (result) => (result as { tasks: unknown[] }).tasks.length === 0,
+      document: (result) => (result as { documents: unknown[] }).documents.length === 0,
+    },
+  },
+  complete_project: {
+    arrange: ({ ownerCtx }) => ({
+      id: createProject.withoutPermissionCheck(ownerCtx, { name: 'Project' }).id,
+    }),
+  },
+  archive_project: {
+    arrange: ({ ownerCtx }) => ({
+      id: createProject.withoutPermissionCheck(ownerCtx, { name: 'Project' }).id,
+    }),
+  },
   list_actors: {
     arrange: () => ({}),
   },

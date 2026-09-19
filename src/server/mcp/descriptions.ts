@@ -3,6 +3,13 @@
  * routes に 'mcp' を含む操作には必ず説明を書く（無ければ登録のときにエラーになる）。
  */
 export const toolDescriptions: Record<string, string> = {
+  list_projects: 'Project を状態で絞り込んで一覧する。',
+  create_project:
+    'Project を作る。概要、エージェント向け instructions、関連リポジトリ、文脈として参照する Document を必要に応じて指定する。',
+  update_project:
+    'active な Project の項目と参照 Document を更新する。更新前に読み、version を渡す。状態は変更できない。',
+  get_project_context:
+    'Project の概要・instructions、終わっていない Task、参照する active Document を作業文脈として取得する。詳細は個別のツールで読む。',
   list_actors: 'Task の担当に指定できる Actor の名前と種別を返す。権限やトークンは返さない。',
   create_task:
     'Task を作る。何をするか（description）と何を満たせば完了か（acceptanceCriteria）を書き、必要なら担当・親 Task・Project を指定する。作った Task は todo になる。',

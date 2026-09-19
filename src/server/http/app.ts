@@ -12,6 +12,7 @@ import { handleError } from './errors.js'
 import { taskRoutes } from './tasks.js'
 import { documentRoutes, documentTagRoutes } from './documents.js'
 import { sessionRoutes } from './sessions.js'
+import { projectRoutes } from './projects.js'
 
 /** REST API（/api）。Web UI 専用で、ログインのセッションだけを受け付ける（設計書 7章） */
 export function createApi(deps: RouteDeps) {
@@ -24,7 +25,7 @@ export function createApi(deps: RouteDeps) {
     .route('/document-tags', documentTagRoutes(deps))
     .route('/documents', documentRoutes(deps).route('/', documentActivityRoutes(deps)))
     .route('/inbox-items', inboxItemActivityRoutes(deps))
-    .route('/projects', projectActivityRoutes(deps))
+    .route('/projects', projectRoutes(deps).route('/', projectActivityRoutes(deps)))
     .route('/tasks', taskRoutes(deps))
 }
 

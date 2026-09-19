@@ -155,23 +155,29 @@ describe('ツールの登録', () => {
       'archive_document',
       'block_task',
       'create_document',
+      'create_project',
       'create_task',
       'get_document',
+      'get_project_context',
       'get_task',
       'list_actionable_tasks',
       'list_actors',
+      'list_projects',
       'list_tasks',
       'request_task_review',
       'return_task_to_todo',
       'start_task',
       'update_document',
+      'update_project',
       'update_task',
     ])
     // ツールが1つもなければ、SDK は tools の機能自体を宣言しない
     expect((await listTools(readOnly)) ?? []).toEqual([
+      'get_project_context',
       'get_task',
       'list_actionable_tasks',
       'list_actors',
+      'list_projects',
       'list_tasks',
     ])
   })
@@ -207,6 +213,21 @@ describe('ツールの登録', () => {
 })
 
 describe('ツールの呼び出し', () => {
+  it('Project を作成し、文脈を MCP 形式の id で返す', async () => {
+    const token = insertToken(database, insertActor(database))
+    const project = await callTool(token, 'create_project', {
+      name: '実装',
+      description: '概要',
+      instructions: '指示',
+    })
+    const created = JSON.parse(project.text) as { id: string }
+    expect(created.id).toBe('project:1')
+    const context: unknown = JSON.parse(
+      (await callTool(token, 'get_project_context', { id: created.id })).text,
+    )
+    expect(context).toMatchObject({ id: created.id, description: '概要', instructions: '指示' })
+  })
+
   it('Document を作成して MCP 形式の id とタグを返す', async () => {
     const token = insertToken(database, insertActor(database))
 
