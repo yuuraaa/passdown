@@ -1,7 +1,7 @@
 import type { Actor, Ctx, Resource } from '../core/operation.js'
 import type { Database } from '../db/connection.js'
 import { recordActivities } from '../modules/activity/index.js'
-import { createTask } from '../modules/task/index.js'
+import { blockTask, createTask, requestTaskReview, startTask } from '../modules/task/index.js'
 import { createDocument } from '../modules/document/index.js'
 import { ctxFor, insertActor, insertProject, insertToken } from './fixtures.js'
 import { tokens } from '../modules/auth/schema.js'
@@ -127,6 +127,74 @@ export const scenarios: Record<string, Scenario> = {
       const task = createTask.withoutPermissionCheck(ownerCtx, { title: '着手する Task' })
       return { id: task.id }
     },
+  },
+  list_tasks: { arrange: () => ({}) },
+  list_actionable_tasks: { arrange: () => ({}) },
+  get_task: {
+    arrange: ({ ownerCtx }) => ({
+      id: createTask.withoutPermissionCheck(ownerCtx, { title: '読む Task' }).id,
+    }),
+    excludes: { document: (result) => (result as { documents: unknown[] }).documents.length === 0 },
+  },
+  update_task: {
+    arrange: ({ ownerCtx }) => {
+      const task = createTask.withoutPermissionCheck(ownerCtx, { title: '更新前' })
+      return {
+        id: task.id,
+        title: '更新後',
+        description: '',
+        acceptanceCriteria: '',
+        priority: 'normal',
+        links: [],
+        assigneeId: null,
+        parentId: null,
+        projectId: null,
+        documentIds: [],
+        version: task.version,
+      }
+    },
+  },
+  add_task_comment: {
+    arrange: ({ ownerCtx }) => ({
+      id: createTask.withoutPermissionCheck(ownerCtx, { title: 'コメント' }).id,
+      body: '本文',
+    }),
+  },
+  block_task: {
+    arrange: ({ ownerCtx }) => {
+      const task = createTask.withoutPermissionCheck(ownerCtx, { title: 'block' })
+      startTask.withoutPermissionCheck(ownerCtx, { id: task.id })
+      return { id: task.id, blockedReason: '理由' }
+    },
+  },
+  request_task_review: {
+    arrange: ({ ownerCtx }) => {
+      const task = createTask.withoutPermissionCheck(ownerCtx, { title: 'review' })
+      startTask.withoutPermissionCheck(ownerCtx, { id: task.id })
+      return { id: task.id, result: '成果' }
+    },
+  },
+  return_task_to_todo: {
+    arrange: ({ ownerCtx }) => {
+      const task = createTask.withoutPermissionCheck(ownerCtx, { title: 'return' })
+      startTask.withoutPermissionCheck(ownerCtx, { id: task.id })
+      blockTask.withoutPermissionCheck(ownerCtx, { id: task.id, blockedReason: '理由' })
+      return { id: task.id, body: '回答' }
+    },
+  },
+  approve_task: {
+    arrange: ({ ownerCtx }) => {
+      const task = createTask.withoutPermissionCheck(ownerCtx, { title: 'approve' })
+      startTask.withoutPermissionCheck(ownerCtx, { id: task.id })
+      requestTaskReview.withoutPermissionCheck(ownerCtx, { id: task.id, result: '成果' })
+      return { id: task.id }
+    },
+  },
+  cancel_task: {
+    arrange: ({ ownerCtx }) => ({
+      id: createTask.withoutPermissionCheck(ownerCtx, { title: 'cancel' }).id,
+      result: '理由',
+    }),
   },
   list_documents: {
     arrange: () => ({}),
