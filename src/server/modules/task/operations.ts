@@ -61,8 +61,9 @@ function readDocumentIds(ctx: Ctx, taskId: number): number[] {
 }
 function detail(ctx: Ctx, task: Task): TaskDetail {
   const documents = hasPermission(ctx.actor, ['document', 'read'])
-    ? readDocumentsByIds(ctx, readDocumentIds(ctx, task.id))
-        .filter((d) => ctx.source === 'web' || d.status === 'active')
+    ? readDocumentsByIds(ctx, readDocumentIds(ctx, task.id)).filter(
+        (d) => ctx.source === 'web' || d.status === 'active',
+      )
     : []
   const parent =
     task.parentId === null
