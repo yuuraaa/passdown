@@ -80,6 +80,7 @@ it('一覧に操作が集まっている', () => {
     'request_task_review',
     'return_task_to_todo',
     'revoke_token',
+    'search',
     'start_task',
     'update_agent_permissions',
     'update_document',

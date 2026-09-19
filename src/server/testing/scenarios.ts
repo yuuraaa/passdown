@@ -36,6 +36,18 @@ export type Scenario = {
  * 操作を足したらここにも足す。足し忘れると表駆動のテストが失敗する。
  */
 export const scenarios: Record<string, Scenario> = {
+  search: {
+    arrange: ({ ownerCtx }) => {
+      createTask.withoutPermissionCheck(ownerCtx, { title: 'Task' })
+      createDocument.withoutPermissionCheck(ownerCtx, { title: 'Document' })
+      return {}
+    },
+    excludes: {
+      task: (result) => (result as { tasks: { items: unknown[] } }).tasks.items.length === 0,
+      document: (result) =>
+        (result as { documents: { items: unknown[] } }).documents.items.length === 0,
+    },
+  },
   list_projects: { arrange: () => ({}) },
   get_project: {
     arrange: ({ ownerCtx }) => ({
