@@ -169,6 +169,80 @@ describe('Task', () => {
   })
 })
 
+describe('Project', () => {
+  it('作成・詳細・更新・文脈・完了・archive を REST API で利用できる', async () => {
+    const created = await app.request('/api/projects', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '実装', description: '概要', instructions: '指示' }),
+    })
+    expect(created.status).toBe(200)
+    const project = (await created.json()) as { id: number; version: number }
+
+    const listed = await app.request('/api/projects?limit=1&offset=0', {
+      headers: { Cookie: cookie },
+    })
+    expect(await listed.json()).toMatchObject({
+      total: 1,
+      items: [{ id: project.id, name: '実装' }],
+    })
+    expect(
+      await (
+        await app.request(`/api/projects/${project.id}`, { headers: { Cookie: cookie } })
+      ).json(),
+    ).toMatchObject({ id: project.id, documents: [] })
+
+    const updated = await app.request(`/api/projects/${project.id}`, {
+      method: 'PATCH',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: '更新後',
+        description: '',
+        instructions: '',
+        repositories: [],
+        documentIds: [],
+        version: project.version,
+      }),
+    })
+    expect(updated.status).toBe(200)
+    expect(
+      await (
+        await app.request(`/api/projects/${project.id}/context`, { headers: { Cookie: cookie } })
+      ).json(),
+    ).toMatchObject({ id: project.id, taskRemaining: 0, documentRemaining: 0 })
+    expect(
+      (
+        await app.request(`/api/projects/${project.id}/complete`, {
+          method: 'POST',
+          headers: { Cookie: cookie },
+        })
+      ).status,
+    ).toBe(200)
+
+    const archived = await app.request('/api/projects', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '取りやめ' }),
+    })
+    const cancelled = (await archived.json()) as { id: number }
+    expect(
+      (
+        await app.request(`/api/projects/${cancelled.id}/archive`, {
+          method: 'POST',
+          headers: { Cookie: cookie },
+        })
+      ).status,
+    ).toBe(200)
+
+    const invalid = await app.request('/api/projects', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '' }),
+    })
+    expect(invalid.status).toBe(400)
+  })
+})
+
 describe('Document', () => {
   it('作成・更新・archive と既存タグ一覧を REST API で利用できる', async () => {
     const created = await app.request('/api/documents', {

@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { ConflictError, NotAllowedError } from '../../core/errors.js'
+import { ConflictError, ForbiddenError, NotAllowedError } from '../../core/errors.js'
 import { createDocument } from '../document/index.js'
 import { documents } from '../document/schema.js'
 import { createTask } from '../task/index.js'
@@ -104,6 +104,35 @@ describe('Project 操作', () => {
     ).toEqual(['project.updated', 'project.document_unlinked', 'project.document_linked'])
   })
 
+  it('Document 権限は参照の追加・削除だけに必要とする', () => {
+    const actor = insertActor(database, { permissions: { document: 'none' } })
+    const limited = ctxFor(database, actor)
+    const project = createProject(limited, { name: '資料なし' })
+    expect(
+      updateProject(limited, {
+        id: project.id,
+        name: '項目更新',
+        description: '',
+        instructions: '',
+        repositories: [],
+        documentIds: [],
+        version: project.version,
+      }),
+    ).toMatchObject({ name: '項目更新' })
+    const document = createDocument(ctx, { title: '資料' })
+    expect(() =>
+      updateProject(limited, {
+        id: project.id,
+        name: '参照追加',
+        description: '',
+        instructions: '',
+        repositories: [],
+        documentIds: [document.id],
+        version: 2,
+      }),
+    ).toThrow(ForbiddenError)
+  })
+
   it('完了できるのは未完了 Task がない active Project だけ', () => {
     const project = create()
     createTask(ctx, { title: '残タスク', projectId: project.id })
@@ -166,5 +195,20 @@ describe('Project 操作', () => {
     expect(getProjectsReferencingDocument(ctx, active.id)).toEqual([
       { id: updated.id, name: project.name, status: 'active' },
     ])
+  })
+
+  it('文脈の50件上限と残件数を明示する', () => {
+    const project = create()
+    for (let index = 0; index < 51; index += 1)
+      createTask(ctx, { title: `Task ${index}`, projectId: project.id })
+    const context = getProjectContext(ctx, { id: project.id })
+    expect(context.tasks[0]).toMatchObject({ title: 'Task 0' })
+    expect(context).toMatchObject({
+      taskTotal: 51,
+      taskRemaining: 1,
+      documentTotal: 0,
+      documentRemaining: 0,
+    })
+    expect(context.tasks).toHaveLength(50)
   })
 })

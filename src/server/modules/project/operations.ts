@@ -1,8 +1,13 @@
 import { and, asc, count, eq, inArray, sql } from 'drizzle-orm'
-import { ConflictError, NotAllowedError, NotFoundError } from '../../core/errors.js'
+import { ConflictError, ForbiddenError, NotAllowedError, NotFoundError } from '../../core/errors.js'
 import { hasPermission, type Ctx, defineOperation } from '../../core/operation.js'
 import { type ActivityRecord, recordActivities } from '../activity/index.js'
-import { getActiveDocuments, getDocument, type DocumentDetail } from '../document/index.js'
+import {
+  getActiveDocuments,
+  getDocument,
+  readDocumentsByIds,
+  type DocumentDetail,
+} from '../document/index.js'
 import {
   cancelUnfinishedProjectTasks,
   getUnfinishedProjectTasks,
@@ -28,8 +33,10 @@ export type ProjectContext = Pick<
 > & {
   tasks: ProjectTaskSummary[]
   taskTotal: number
+  taskRemaining: number
   documents: Pick<DocumentDetail, 'id' | 'title' | 'tags'>[]
   documentTotal: number
+  documentRemaining: number
 }
 export type DocumentProjectReference = Pick<Project, 'id' | 'name' | 'status'>
 
@@ -51,13 +58,17 @@ function detail(ctx: Ctx, project: Project): ProjectDetail {
   return {
     ...project,
     documents: hasPermission(ctx.actor, ['document', 'read'])
-      ? readDocumentIds(ctx, project.id).map((id) => getDocument(ctx, id))
+      ? readDocumentsByIds(ctx, readDocumentIds(ctx, project.id))
       : [],
   }
 }
 function ensureActive(project: Project): void {
   if (project.status !== 'active')
     throw new NotAllowedError(`project:${project.id} は ${project.status} のため操作できません`)
+}
+function ensureDocumentRead(ctx: Ctx): void {
+  if (!hasPermission(ctx.actor, ['document', 'read']))
+    throw new ForbiddenError('Document の参照を変更するには document の read 権限が必要です')
 }
 function activity(
   eventType: ActivityRecord['eventType'],
@@ -133,14 +144,12 @@ export const getProjectOperation = defineOperation({
 export const createProject = defineOperation({
   name: 'create_project',
   routes: ['web', 'mcp'],
-  requires: [
-    ['project', 'readwrite'],
-    ['document', 'read'],
-  ],
+  requires: [['project', 'readwrite']],
   returns: [],
   entity: 'project',
   input: createProjectInput,
   run: (ctx, input) => {
+    if (input.documentIds.length) ensureDocumentRead(ctx)
     for (const id of input.documentIds) getDocument(ctx, id)
     const project = ctx.db
       .insert(projects)
@@ -180,10 +189,7 @@ export const createProject = defineOperation({
 export const updateProject = defineOperation({
   name: 'update_project',
   routes: ['web', 'mcp'],
-  requires: [
-    ['project', 'readwrite'],
-    ['document', 'read'],
-  ],
+  requires: [['project', 'readwrite']],
   returns: [],
   entity: 'project',
   input: updateProjectInput,
@@ -194,7 +200,14 @@ export const updateProject = defineOperation({
       throw new ConflictError(
         `project:${before.id} はほかの操作で更新されました。読み直してからやり直してください`,
       )
-    for (const id of input.documentIds) getDocument(ctx, id)
+    const previous = readDocumentIds(ctx, before.id)
+    const next = [...new Set(input.documentIds)]
+    if (
+      (previous.length !== next.length || previous.some((id) => !next.includes(id))) &&
+      !hasPermission(ctx.actor, ['document', 'read'])
+    )
+      ensureDocumentRead(ctx)
+    for (const id of next) getDocument(ctx, id)
     const updated = ctx.db
       .update(projects)
       .set({
@@ -211,8 +224,6 @@ export const updateProject = defineOperation({
       throw new ConflictError(
         `project:${before.id} はほかの操作で更新されました。読み直してからやり直してください`,
       )
-    const previous = readDocumentIds(ctx, before.id)
-    const next = [...new Set(input.documentIds)]
     ctx.db.delete(projectDocuments).where(eq(projectDocuments.projectId, before.id)).run()
     if (next.length)
       ctx.db
@@ -268,8 +279,10 @@ export const getProjectContext = defineOperation({
       repositories: project.repositories,
       tasks: allTasks.slice(0, 50),
       taskTotal: allTasks.length,
+      taskRemaining: Math.max(allTasks.length - 50, 0),
       documents: allDocuments.slice(0, 50).map(({ id, title, tags }) => ({ id, title, tags })),
       documentTotal: allDocuments.length,
+      documentRemaining: Math.max(allDocuments.length - 50, 0),
     }
   },
 })

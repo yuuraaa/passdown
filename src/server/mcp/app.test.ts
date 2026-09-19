@@ -4,7 +4,7 @@ import { createApp } from '../app.js'
 import { defineOperation } from '../core/operation.js'
 import type { Database } from '../db/connection.js'
 import { activities } from '../modules/activity/schema.js'
-import { createTaskInput } from '../modules/task/index.js'
+import { createTask, createTaskInput } from '../modules/task/index.js'
 import { archiveDocument, createDocument } from '../modules/document/index.js'
 import { createTestDatabase } from '../testing/db.js'
 import {
@@ -173,12 +173,14 @@ describe('ツールの登録', () => {
     ])
     // ツールが1つもなければ、SDK は tools の機能自体を宣言しない
     expect((await listTools(readOnly)) ?? []).toEqual([
+      'create_project',
       'get_project_context',
       'get_task',
       'list_actionable_tasks',
       'list_actors',
       'list_projects',
       'list_tasks',
+      'update_project',
     ])
   })
 
@@ -214,7 +216,8 @@ describe('ツールの登録', () => {
 
 describe('ツールの呼び出し', () => {
   it('Project を作成し、文脈を MCP 形式の id で返す', async () => {
-    const token = insertToken(database, insertActor(database))
+    const actor = insertActor(database)
+    const token = insertToken(database, actor)
     const project = await callTool(token, 'create_project', {
       name: '実装',
       description: '概要',
@@ -222,10 +225,16 @@ describe('ツールの呼び出し', () => {
     })
     const created = JSON.parse(project.text) as { id: string }
     expect(created.id).toBe('project:1')
+    createTask(ctxFor(database, actor), { title: '文脈の Task', projectId: 1 })
     const context: unknown = JSON.parse(
       (await callTool(token, 'get_project_context', { id: created.id })).text,
     )
-    expect(context).toMatchObject({ id: created.id, description: '概要', instructions: '指示' })
+    expect(context).toMatchObject({
+      id: created.id,
+      description: '概要',
+      instructions: '指示',
+      tasks: [{ id: 'task:1' }],
+    })
   })
 
   it('Document を作成して MCP 形式の id とタグを返す', async () => {
