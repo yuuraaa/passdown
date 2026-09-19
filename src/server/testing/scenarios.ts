@@ -1,9 +1,15 @@
 import type { Actor, Ctx, Resource } from '../core/operation.js'
 import type { Database } from '../db/connection.js'
 import { recordActivities } from '../modules/activity/index.js'
-import { blockTask, createTask, requestTaskReview, startTask } from '../modules/task/index.js'
+import {
+  blockTask,
+  createTask,
+  requestTaskReview,
+  startTask,
+  updateTask,
+} from '../modules/task/index.js'
 import { createDocument } from '../modules/document/index.js'
-import { createProject } from '../modules/project/index.js'
+import { createProject, updateProject } from '../modules/project/index.js'
 import { ctxFor, insertActor, insertProject, insertToken } from './fixtures.js'
 import { tokens } from '../modules/auth/schema.js'
 
@@ -245,6 +251,40 @@ export const scenarios: Record<string, Scenario> = {
     arrange: ({ ownerCtx }) => ({
       id: createDocument.withoutPermissionCheck(ownerCtx, { title: 'Document' }).id,
     }),
+  },
+  get_document_references: {
+    arrange: ({ ownerCtx }) => {
+      const document = createDocument.withoutPermissionCheck(ownerCtx, { title: 'Document' })
+      const task = createTask.withoutPermissionCheck(ownerCtx, { title: 'Task' })
+      updateTask.withoutPermissionCheck(ownerCtx, {
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        acceptanceCriteria: task.acceptanceCriteria,
+        priority: task.priority,
+        links: task.links,
+        assigneeId: task.assigneeId,
+        parentId: task.parentId,
+        projectId: task.projectId,
+        documentIds: [document.id],
+        version: task.version,
+      })
+      const project = createProject.withoutPermissionCheck(ownerCtx, { name: 'Project' })
+      updateProject.withoutPermissionCheck(ownerCtx, {
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        instructions: project.instructions,
+        repositories: project.repositories,
+        documentIds: [document.id],
+        version: project.version,
+      })
+      return { id: document.id }
+    },
+    excludes: {
+      task: (result) => (result as { tasks: unknown[] }).tasks.length === 0,
+      project: (result) => (result as { projects: unknown[] }).projects.length === 0,
+    },
   },
   create_document: {
     arrange: () => ({ title: 'Document', tags: ['設計'] }),

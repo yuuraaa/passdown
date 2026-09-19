@@ -1,17 +1,20 @@
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { ConflictError, NotAllowedError } from '../../core/errors.js'
+import { ConflictError, NotAllowedError, NotFoundError } from '../../core/errors.js'
 import type { Ctx } from '../../core/operation.js'
 import type { Database } from '../../db/connection.js'
 import { createTestDatabase } from '../../testing/db.js'
 import { changedTables, expectRecorded, snapshotTables } from '../../testing/recorded.js'
 import { ctxFor, insertActor } from '../../testing/fixtures.js'
 import { activities } from '../activity/schema.js'
+import { createProject, updateProject } from '../project/index.js'
+import { createTask, updateTask } from '../task/index.js'
 import {
   archiveDocument,
   createDocument,
   getActiveDocuments,
   getDocumentOperation,
+  getDocumentReferences,
   listDocumentTags,
   listDocuments,
   updateDocument,
@@ -148,6 +151,43 @@ describe('Document の操作', () => {
     const document = create({ title: '資料' })
     archiveDocument(ctx, { id: document.id })
     expect(getDocumentOperation(ctx, { id: document.id }).status).toBe('archived')
+  })
+
+  it('Task・Project の公開 API を通じて参照元をまとめて返す', () => {
+    const document = create({ title: '資料' })
+    const task = createTask(ctx, { title: '参照する Task' })
+    updateTask(ctx, {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      acceptanceCriteria: task.acceptanceCriteria,
+      priority: task.priority,
+      links: task.links,
+      assigneeId: task.assigneeId,
+      parentId: task.parentId,
+      projectId: task.projectId,
+      documentIds: [document.id],
+      version: task.version,
+    })
+    const project = createProject(ctx, { name: '参照する Project' })
+    updateProject(ctx, {
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      instructions: project.instructions,
+      repositories: project.repositories,
+      documentIds: [document.id],
+      version: project.version,
+    })
+
+    expect(getDocumentReferences(ctx, { id: document.id })).toEqual({
+      tasks: [{ id: task.id, title: task.title, status: 'todo', projectId: null }],
+      projects: [{ id: project.id, name: project.name, status: 'active' }],
+    })
+  })
+
+  it('参照元取得は存在しない Document を返さない', () => {
+    expect(() => getDocumentReferences(ctx, { id: 999 })).toThrow(NotFoundError)
   })
 
   it('archive は現在の状態を条件にして更新する', () => {

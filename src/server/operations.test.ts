@@ -58,6 +58,7 @@ it('一覧に操作が集まっている', () => {
     'get_actor_activities',
     'get_document',
     'get_document_activities',
+    'get_document_references',
     'get_inbox_item_activities',
     'get_project',
     'get_project_activities',

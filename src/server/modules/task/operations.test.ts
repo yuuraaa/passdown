@@ -8,6 +8,7 @@ import { ctxFor, insertActor, insertProject } from '../../testing/fixtures.js'
 import { changedTables, expectRecorded, snapshotTables } from '../../testing/recorded.js'
 import { activities } from '../activity/schema.js'
 import { createDocument } from '../document/index.js'
+import { documents } from '../document/schema.js'
 import {
   addTaskComment,
   blockTask,
@@ -15,6 +16,7 @@ import {
   cancelUnfinishedProjectTasks,
   createTask,
   getTasksReferencingDocument,
+  getTaskOperation,
   getUnfinishedProjectTasks,
   hasUnfinishedProjectTasks,
   requestTaskReview,
@@ -282,6 +284,25 @@ describe('Task の更新・完了処理', () => {
     ).toEqual([{ taskId: task.id, documentId: second.id }])
     expect(activitiesOf(task.id).map((a) => a.eventType)).toContain('task.document_linked')
     expect(activitiesOf(task.id).map((a) => a.eventType)).toContain('task.document_unlinked')
+  })
+
+  it('Web の詳細には archived Document を残し、MCP の詳細からは除く', () => {
+    const task = create({ title: 't' })
+    const active = createDocument(ctx, { title: 'active' })
+    const archived = createDocument(ctx, { title: 'archived' })
+    const updated = updateTask(ctx, { ...updateInput(task), documentIds: [active.id, archived.id] })
+    database.db
+      .update(documents)
+      .set({ status: 'archived' })
+      .where(eq(documents.id, archived.id))
+      .run()
+
+    expect(getTaskOperation(ctxFor(database, ctx.actor, 'web'), { id: updated.id }).documents).toHaveLength(
+      2,
+    )
+    expect(getTaskOperation(ctx, { id: updated.id }).documents).toEqual([
+      expect.objectContaining({ id: active.id, status: 'active' }),
+    ])
   })
 
   it('コメントだけでは version を上げず、todo 復帰ではコメントと blockedReason の消去を行う', () => {

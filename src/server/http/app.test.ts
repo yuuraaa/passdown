@@ -9,9 +9,11 @@ import { formatDatetime } from '../core/time.js'
 import type { Database } from '../db/connection.js'
 import { recordActivities } from '../modules/activity/index.js'
 import { activities } from '../modules/activity/schema.js'
+import { createProject, updateProject } from '../modules/project/index.js'
 import { sessions } from '../modules/auth/schema.js'
 import { humanCredentials } from '../modules/auth/schema.js'
 import { hashPassword, hashSecret } from '../modules/auth/index.js'
+import { createTask, updateTask } from '../modules/task/index.js'
 import { createTestDatabase } from '../testing/db.js'
 import { ctxFor, FIXED_NOW, insertActor, insertSession, insertToken } from '../testing/fixtures.js'
 import type { ApiType } from './app.js'
@@ -266,6 +268,39 @@ describe('Document', () => {
     })
     expect(await detail.json()).toMatchObject({ id: document.id, content: '本文', tags: ['k8s'] })
 
+    const task = createTask(ctxFor(database, owner), { title: '参照する Task' })
+    updateTask(ctxFor(database, owner), {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      acceptanceCriteria: task.acceptanceCriteria,
+      priority: task.priority,
+      links: task.links,
+      assigneeId: task.assigneeId,
+      parentId: task.parentId,
+      projectId: task.projectId,
+      documentIds: [document.id],
+      version: task.version,
+    })
+    const project = createProject(ctxFor(database, owner), { name: '参照する Project' })
+    updateProject(ctxFor(database, owner), {
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      instructions: project.instructions,
+      repositories: project.repositories,
+      documentIds: [document.id],
+      version: project.version,
+    })
+    const references = await app.request(`/api/documents/${document.id}/references`, {
+      headers: { Cookie: cookie },
+    })
+    expect(references.status).toBe(200)
+    expect(await references.json()).toEqual({
+      tasks: [{ id: task.id, title: task.title, status: 'todo', projectId: null }],
+      projects: [{ id: project.id, name: project.name, status: 'active' }],
+    })
+
     const updated = await app.request(`/api/documents/${document.id}`, {
       method: 'PATCH',
       headers: { Cookie: cookie, 'Content-Type': 'application/json' },
@@ -287,6 +322,14 @@ describe('Document', () => {
     })
     expect(archived.status).toBe(200)
     expect(await archived.json()).toMatchObject({ status: 'archived', version: 3 })
+
+    const archivedReferences = await app.request(`/api/documents/${document.id}/references`, {
+      headers: { Cookie: cookie },
+    })
+    expect(await archivedReferences.json()).toMatchObject({
+      tasks: [{ id: task.id }],
+      projects: [{ id: project.id }],
+    })
 
     const invalid = await app.request('/api/documents', {
       method: 'POST',
