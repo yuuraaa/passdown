@@ -3,7 +3,7 @@ import { ConflictError, NotAllowedError, NotFoundError } from '../../core/errors
 import { hasPermission, type Ctx, defineOperation } from '../../core/operation.js'
 import { type ActivityRecord, recordActivities } from '../activity/index.js'
 import { assertActorExists } from '../auth/index.js'
-import { getDocument } from '../document/index.js'
+import { getDocument, readDocumentsByIds } from '../document/index.js'
 import { getProjectStatus } from '../project/index.js'
 import {
   addTaskCommentInput,
@@ -61,8 +61,7 @@ function readDocumentIds(ctx: Ctx, taskId: number): number[] {
 }
 function detail(ctx: Ctx, task: Task): TaskDetail {
   const documents = hasPermission(ctx.actor, ['document', 'read'])
-    ? readDocumentIds(ctx, task.id)
-        .map((id) => getDocument(ctx, id))
+    ? readDocumentsByIds(ctx, readDocumentIds(ctx, task.id))
         .filter((d) => ctx.source === 'web' || d.status === 'active')
     : []
   const parent =

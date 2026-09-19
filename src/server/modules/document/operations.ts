@@ -1,7 +1,12 @@
 import { and, asc, count, eq, inArray, sql } from 'drizzle-orm'
 import { ConflictError, NotAllowedError, NotFoundError } from '../../core/errors.js'
-import { type Ctx, defineOperation } from '../../core/operation.js'
+import { hasPermission, type Ctx, defineOperation } from '../../core/operation.js'
 import { type ActivityRecord, recordActivities } from '../activity/index.js'
+import {
+  getProjectsReferencingDocument,
+  type DocumentProjectReference,
+} from '../project/index.js'
+import { getTasksReferencingDocument, type DocumentTaskReference } from '../task/index.js'
 import {
   archiveDocumentInput,
   createDocumentInput,
@@ -15,6 +20,10 @@ import { documents, documentTags } from './schema.js'
 export type Document = typeof documents.$inferSelect
 export type DocumentDetail = Document & { tags: string[] }
 export type DocumentPage = { items: DocumentDetail[]; total: number }
+export type DocumentReferences = {
+  tasks: DocumentTaskReference[]
+  projects: DocumentProjectReference[]
+}
 
 function readDocument(ctx: Ctx, id: number): Document {
   const document = ctx.db.select().from(documents).where(eq(documents.id, id)).get()
@@ -133,6 +142,27 @@ export const getDocumentOperation = defineOperation({
   entity: 'document',
   input: getDocumentInput,
   run: (ctx, input) => getDocument(ctx, input.id),
+})
+
+/** Document 詳細画面で、参照している Task・Project を返す。 */
+export const getDocumentReferences = defineOperation({
+  name: 'get_document_references',
+  routes: ['web'],
+  requires: [['document', 'read']],
+  returns: ['task', 'project'],
+  entity: 'document',
+  input: getDocumentInput,
+  run: (ctx, input): DocumentReferences => {
+    readDocument(ctx, input.id)
+    return {
+      tasks: hasPermission(ctx.actor, ['task', 'read'])
+        ? getTasksReferencingDocument(ctx, input.id)
+        : [],
+      projects: hasPermission(ctx.actor, ['project', 'read'])
+        ? getProjectsReferencingDocument(ctx, input.id)
+        : [],
+    }
+  },
 })
 
 export const createDocument = defineOperation({
