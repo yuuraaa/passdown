@@ -8,6 +8,18 @@ export const toolDescriptions: Record<string, string> = {
     'Task を作る。何をするか（description）と何を満たせば完了か（acceptanceCriteria）を書き、必要なら担当・親 Task・Project を指定する。作った Task は todo になる。',
   start_task:
     '担当の todo の Task に着手し、in_progress にする。親 Task が todo なら、親も自動で in_progress になる。',
+  list_tasks:
+    'Task を状態・Project・担当で絞り込んで一覧する。過去の Task の経緯を探すときにも使う。',
+  list_actionable_tasks:
+    '自分が担当する todo のうち、子 Task を持たない着手可能な Task を優先度順で返す。',
+  get_task: 'Task の本文、コメント、親子関係、参照 Document を読む。作業の再開前に必ず使う。',
+  update_task:
+    '終わっていない Task の項目、担当、親、Project、参照 Document を更新する。更新前に読み、version を渡す。状態は変更できない。',
+  add_task_comment: 'Task にコメントを追加する。コメントだけでは状態を変更しない。',
+  block_task: '作業を続けられない in_progress の Task を、理由とともに blocked にする。',
+  request_task_review: '完了した in_progress の Task に成果を記録して review に出す。',
+  return_task_to_todo:
+    'blocked の回答または review の差し戻し理由をコメントに残し、Task を todo に戻す。',
   get_document: 'Document の本文・タグを読む。作業の文脈として必要な資料を確認するときに使う。',
   create_document:
     '作業の文脈になる Markdown 資料を作る。タグを付ける前に既存のタグを確認し、同じ意味の別表記を増やさない。',

@@ -151,16 +151,29 @@ describe('ツールの登録', () => {
     )
 
     expect(await listTools(full)).toEqual([
+      'add_task_comment',
       'archive_document',
+      'block_task',
       'create_document',
       'create_task',
       'get_document',
+      'get_task',
+      'list_actionable_tasks',
       'list_actors',
+      'list_tasks',
+      'request_task_review',
+      'return_task_to_todo',
       'start_task',
       'update_document',
+      'update_task',
     ])
     // ツールが1つもなければ、SDK は tools の機能自体を宣言しない
-    expect((await listTools(readOnly)) ?? []).toEqual(['list_actors'])
+    expect((await listTools(readOnly)) ?? []).toEqual([
+      'get_task',
+      'list_actionable_tasks',
+      'list_actors',
+      'list_tasks',
+    ])
   })
 
   it('id の入力は `<種類>:<id>` の文字列で受け取る', async () => {
