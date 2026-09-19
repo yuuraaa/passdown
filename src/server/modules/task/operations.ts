@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, notInArray, sql } from 'drizzle-orm'
+import { and, asc, count, eq, gte, inArray, lte, notInArray, or, sql } from 'drizzle-orm'
 import { ConflictError, NotAllowedError, NotFoundError } from '../../core/errors.js'
 import { hasPermission, type Ctx, defineOperation } from '../../core/operation.js'
 import { type ActivityRecord, recordActivities } from '../activity/index.js'
@@ -30,6 +30,22 @@ import { taskComments, taskDocuments, tasks } from './schema.js'
 
 export type Task = typeof tasks.$inferSelect
 export type TaskComment = typeof taskComments.$inferSelect
+export type TaskSearchFilter = {
+  words: readonly string[]
+  projectId?: number
+  actorId?: number
+  statuses: readonly TaskStatus[]
+  createdFrom?: string
+  createdTo?: string
+  updatedFrom?: string
+  updatedTo?: string
+  limit: number
+}
+export type TaskSearchItem = Pick<Task, 'id' | 'title' | 'status' | 'updatedAt'> & {
+  matchedFields: Array<'title' | 'description' | 'result' | 'blockedReason'>
+  matchedComments: Pick<TaskComment, 'id' | 'body' | 'createdAt'>[]
+}
+export type TaskSearchPage = { items: TaskSearchItem[]; total: number }
 export type TaskDetail = Task & {
   comments: TaskComment[]
   documents: ReturnType<typeof getDocument>[]
@@ -49,6 +65,141 @@ function readComments(ctx: Ctx, taskId: number): TaskComment[] {
     .where(eq(taskComments.taskId, taskId))
     .orderBy(asc(taskComments.id))
     .all()
+}
+
+function escapeLike(word: string): string {
+  return `%${word.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
+}
+
+function taskSearchWhere(filter: TaskSearchFilter) {
+  return and(
+    inArray(tasks.status, [...filter.statuses]),
+    filter.projectId === undefined ? undefined : eq(tasks.projectId, filter.projectId),
+    filter.actorId === undefined
+      ? undefined
+      : or(eq(tasks.assigneeId, filter.actorId), eq(tasks.createdBy, filter.actorId)),
+    filter.createdFrom === undefined ? undefined : gte(tasks.createdAt, filter.createdFrom),
+    filter.createdTo === undefined ? undefined : lte(tasks.createdAt, filter.createdTo),
+    filter.updatedFrom === undefined ? undefined : gte(tasks.updatedAt, filter.updatedFrom),
+    filter.updatedTo === undefined ? undefined : lte(tasks.updatedAt, filter.updatedTo),
+  )
+}
+
+/** search モジュール向け。Task とコメントの検索SQLは Task モジュールに閉じる。 */
+export function searchTasks(ctx: Ctx, filter: TaskSearchFilter): TaskSearchPage {
+  type MatchedTask = TaskSearchItem & {
+    matchedWords: Set<number>
+    comments: Map<number, Pick<TaskComment, 'id' | 'body' | 'createdAt'>>
+  }
+  const matched = new Map<number, MatchedTask>()
+  const baseWhere = taskSearchWhere(filter)
+  const words = filter.words.length === 0 ? [''] : filter.words
+  const get = (id: number, title: string, status: TaskStatus, updatedAt: string): MatchedTask => {
+    const entry = matched.get(id) ?? {
+      id,
+      title,
+      status,
+      updatedAt,
+      matchedFields: [],
+      matchedComments: [],
+      matchedWords: new Set<number>(),
+      comments: new Map(),
+    }
+    matched.set(id, entry)
+    return entry
+  }
+
+  for (const [wordIndex, word] of words.entries()) {
+    const pattern = escapeLike(word)
+    const taskRows = ctx.db
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        status: tasks.status,
+        updatedAt: tasks.updatedAt,
+        titleMatched:
+          word === ''
+            ? sql<number>`0`
+            : sql<number>`case when ${tasks.title} like ${pattern} escape '\\' then 1 else 0 end`,
+        descriptionMatched:
+          word === ''
+            ? sql<number>`0`
+            : sql<number>`case when ${tasks.description} like ${pattern} escape '\\' then 1 else 0 end`,
+        resultMatched:
+          word === ''
+            ? sql<number>`0`
+            : sql<number>`case when ${tasks.result} like ${pattern} escape '\\' then 1 else 0 end`,
+        blockedReasonMatched:
+          word === ''
+            ? sql<number>`0`
+            : sql<number>`case when ${tasks.blockedReason} like ${pattern} escape '\\' then 1 else 0 end`,
+      })
+      .from(tasks)
+      .where(
+        and(
+          baseWhere,
+          word === ''
+            ? undefined
+            : or(
+                sql`${tasks.title} like ${pattern} escape '\\'`,
+                sql`${tasks.description} like ${pattern} escape '\\'`,
+                sql`${tasks.result} like ${pattern} escape '\\'`,
+                sql`${tasks.blockedReason} like ${pattern} escape '\\'`,
+              ),
+        ),
+      )
+      .all()
+    for (const row of taskRows) {
+      const entry = get(row.id, row.title, row.status, row.updatedAt)
+      entry.matchedWords.add(wordIndex)
+      for (const [field, isMatched] of [
+        ['title', row.titleMatched],
+        ['description', row.descriptionMatched],
+        ['result', row.resultMatched],
+        ['blockedReason', row.blockedReasonMatched],
+      ] as const) {
+        if (isMatched && !entry.matchedFields.includes(field)) entry.matchedFields.push(field)
+      }
+    }
+    if (word !== '') {
+      const commentRows = ctx.db
+        .select({
+          taskId: tasks.id,
+          title: tasks.title,
+          status: tasks.status,
+          updatedAt: tasks.updatedAt,
+          id: taskComments.id,
+          body: taskComments.body,
+          createdAt: taskComments.createdAt,
+        })
+        .from(taskComments)
+        .innerJoin(tasks, eq(taskComments.taskId, tasks.id))
+        .where(and(baseWhere, sql`${taskComments.body} like ${pattern} escape '\\'`))
+        .all()
+      for (const row of commentRows) {
+        const entry = get(row.taskId, row.title, row.status, row.updatedAt)
+        entry.matchedWords.add(wordIndex)
+        entry.comments.set(row.id, { id: row.id, body: row.body, createdAt: row.createdAt })
+      }
+    }
+  }
+  const items = [...matched.values()]
+    .filter((item) => item.matchedWords.size === words.length)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id - a.id)
+  return {
+    total: items.length,
+    items: items.slice(0, filter.limit).map((item) => ({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      updatedAt: item.updatedAt,
+      matchedFields: item.matchedFields,
+      matchedComments: [...item.comments.values()]
+        .sort((a, b) => b.id - a.id)
+        .slice(0, 5)
+        .sort((a, b) => a.id - b.id),
+    })),
+  }
 }
 function readDocumentIds(ctx: Ctx, taskId: number): number[] {
   return ctx.db

@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, count, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 import { ConflictError, NotAllowedError, NotFoundError } from '../../core/errors.js'
 import { hasPermission, type Ctx, defineOperation } from '../../core/operation.js'
 import { type ActivityRecord, recordActivities } from '../activity/index.js'
@@ -10,6 +10,7 @@ import {
   documentPageInput,
   getDocumentInput,
   listDocumentTagsInput,
+  type DocumentStatus,
   updateDocumentInput,
 } from './inputs.js'
 import { documents, documentTags } from './schema.js'
@@ -21,6 +22,21 @@ export type DocumentReferences = {
   tasks: DocumentTaskReference[]
   projects: DocumentProjectReference[]
 }
+export type DocumentSearchFilter = {
+  words: readonly string[]
+  documentIds?: readonly number[]
+  tag?: string
+  statuses: readonly DocumentStatus[]
+  createdFrom?: string
+  createdTo?: string
+  updatedFrom?: string
+  updatedTo?: string
+  limit: number
+}
+export type DocumentSearchItem = Pick<Document, 'id' | 'title' | 'status' | 'updatedAt'> & {
+  matchedFields: Array<'title' | 'content'>
+}
+export type DocumentSearchPage = { items: DocumentSearchItem[]; total: number }
 
 function readDocument(ctx: Ctx, id: number): Document {
   const document = ctx.db.select().from(documents).where(eq(documents.id, id)).get()
@@ -38,6 +54,88 @@ function readTags(ctx: Ctx, documentId: number): string[] {
     .orderBy(asc(documentTags.tag))
     .all()
     .map((row) => row.tag)
+}
+
+function escapeLike(word: string): string {
+  return `%${word.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
+}
+
+/** search モジュール向け。Document の検索SQLは Document モジュールに閉じる。 */
+export function searchDocuments(ctx: Ctx, filter: DocumentSearchFilter): DocumentSearchPage {
+  if (filter.documentIds !== undefined && filter.documentIds.length === 0)
+    return { items: [], total: 0 }
+  const baseWhere = and(
+    inArray(documents.status, [...filter.statuses]),
+    filter.documentIds === undefined
+      ? undefined
+      : inArray(documents.id, [...new Set(filter.documentIds)]),
+    filter.tag === undefined
+      ? undefined
+      : sql`exists (select 1 from ${documentTags} where ${documentTags.documentId} = ${documents.id} and ${documentTags.tag} = ${filter.tag})`,
+    filter.createdFrom === undefined ? undefined : gte(documents.createdAt, filter.createdFrom),
+    filter.createdTo === undefined ? undefined : lte(documents.createdAt, filter.createdTo),
+    filter.updatedFrom === undefined ? undefined : gte(documents.updatedAt, filter.updatedFrom),
+    filter.updatedTo === undefined ? undefined : lte(documents.updatedAt, filter.updatedTo),
+  )
+  const matched = new Map<number, DocumentSearchItem & { matchedWords: Set<number> }>()
+  const words = filter.words.length === 0 ? [''] : filter.words
+  for (const [wordIndex, word] of words.entries()) {
+    const pattern = escapeLike(word)
+    const rows = ctx.db
+      .select({
+        id: documents.id,
+        title: documents.title,
+        status: documents.status,
+        updatedAt: documents.updatedAt,
+        titleMatched:
+          word === ''
+            ? sql<number>`0`
+            : sql<number>`case when ${documents.title} like ${pattern} escape '\\' then 1 else 0 end`,
+        contentMatched:
+          word === ''
+            ? sql<number>`0`
+            : sql<number>`case when ${documents.content} like ${pattern} escape '\\' then 1 else 0 end`,
+      })
+      .from(documents)
+      .where(
+        and(
+          baseWhere,
+          word === ''
+            ? undefined
+            : sql`(${documents.title} like ${pattern} escape '\\' or ${documents.content} like ${pattern} escape '\\')`,
+        ),
+      )
+      .all()
+    for (const row of rows) {
+      const entry = matched.get(row.id) ?? {
+        id: row.id,
+        title: row.title,
+        status: row.status,
+        updatedAt: row.updatedAt,
+        matchedFields: [],
+        matchedWords: new Set<number>(),
+      }
+      entry.matchedWords.add(wordIndex)
+      if (row.titleMatched && !entry.matchedFields.includes('title'))
+        entry.matchedFields.push('title')
+      if (row.contentMatched && !entry.matchedFields.includes('content'))
+        entry.matchedFields.push('content')
+      matched.set(row.id, entry)
+    }
+  }
+  const items = [...matched.values()]
+    .filter((item) => item.matchedWords.size === words.length)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id - a.id)
+  return {
+    total: items.length,
+    items: items.slice(0, filter.limit).map((item) => ({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      updatedAt: item.updatedAt,
+      matchedFields: item.matchedFields,
+    })),
+  }
 }
 
 function detail(ctx: Ctx, document: Document): DocumentDetail {

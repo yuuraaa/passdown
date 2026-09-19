@@ -5,6 +5,9 @@ export {
   type DocumentDetail,
   type DocumentPage,
   type DocumentReferences,
+  type DocumentSearchFilter,
+  type DocumentSearchItem,
+  type DocumentSearchPage,
   getActiveDocuments,
   getDocument,
   getDocumentOperation,
@@ -13,6 +16,7 @@ export {
   listDocumentTags,
   listDocuments,
   readDocumentsByIds,
+  searchDocuments,
   updateDocument,
 } from './operations.js'
 export {
