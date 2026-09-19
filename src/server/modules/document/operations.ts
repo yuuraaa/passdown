@@ -2,10 +2,7 @@ import { and, asc, count, eq, inArray, sql } from 'drizzle-orm'
 import { ConflictError, NotAllowedError, NotFoundError } from '../../core/errors.js'
 import { hasPermission, type Ctx, defineOperation } from '../../core/operation.js'
 import { type ActivityRecord, recordActivities } from '../activity/index.js'
-import {
-  getProjectsReferencingDocument,
-  type DocumentProjectReference,
-} from '../project/index.js'
+import { getProjectsReferencingDocument, type DocumentProjectReference } from '../project/index.js'
 import { getTasksReferencingDocument, type DocumentTaskReference } from '../task/index.js'
 import {
   archiveDocumentInput,

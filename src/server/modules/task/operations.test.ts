@@ -297,9 +297,9 @@ describe('Task の更新・完了処理', () => {
       .where(eq(documents.id, archived.id))
       .run()
 
-    expect(getTaskOperation(ctxFor(database, ctx.actor, 'web'), { id: updated.id }).documents).toHaveLength(
-      2,
-    )
+    expect(
+      getTaskOperation(ctxFor(database, ctx.actor, 'web'), { id: updated.id }).documents,
+    ).toHaveLength(2)
     expect(getTaskOperation(ctx, { id: updated.id }).documents).toEqual([
       expect.objectContaining({ id: active.id, status: 'active' }),
     ])
