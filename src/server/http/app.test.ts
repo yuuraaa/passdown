@@ -341,6 +341,51 @@ describe('Document', () => {
   })
 })
 
+describe('Inbox', () => {
+  it('取り込み・一覧・更新・変換・archive を REST API で利用できる', async () => {
+    const captured = await app.request('/api/inbox-items', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: '思いつき' }),
+    })
+    const item = (await captured.json()) as { id: number; version: number }
+
+    expect(
+      await (await app.request('/api/inbox-items', { headers: { Cookie: cookie } })).json(),
+    ).toMatchObject({ total: 1, items: [{ id: item.id, status: 'untriaged' }] })
+    const updated = await app.request(`/api/inbox-items/${item.id}`, {
+      method: 'PATCH',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: '更新後', version: item.version }),
+    })
+    expect(updated.status).toBe(200)
+    expect(
+      (
+        await app.request(`/api/inbox-items/${item.id}/convert`, {
+          method: 'POST',
+          headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target: { targetType: 'task', target: { title: '変換先' } } }),
+        })
+      ).status,
+    ).toBe(200)
+
+    const archived = await app.request('/api/inbox-items', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: '不要なメモ' }),
+    })
+    const archivedItem = (await archived.json()) as { id: number }
+    expect(
+      (
+        await app.request(`/api/inbox-items/${archivedItem.id}/archive`, {
+          method: 'POST',
+          headers: { Cookie: cookie },
+        })
+      ).status,
+    ).toBe(200)
+  })
+})
+
 describe('Activity', () => {
   it('ログインした人間が Task の Activity を取得できる', async () => {
     const created = await client().tasks.$post({ json: { title: '履歴を確認する Task' } })

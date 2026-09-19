@@ -3,9 +3,9 @@ import {
   activityPageInput,
   getActorActivities,
   getDocumentActivities,
-  getInboxItemActivities,
   getProjectActivities,
 } from '../modules/activity/index.js'
+import { getInboxItemActivities } from '../modules/inbox/index.js'
 import { type ApiEnv, type RouteDeps, webCtx } from './context.js'
 import { expose } from './registry.js'
 import { idParam, zValidator } from './validator.js'

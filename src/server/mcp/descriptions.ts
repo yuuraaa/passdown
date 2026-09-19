@@ -3,6 +3,14 @@
  * routes に 'mcp' を含む操作には必ず説明を書く（無ければ登録のときにエラーになる）。
  */
 export const toolDescriptions: Record<string, string> = {
+  capture_inbox_item:
+    '整理すると Project / Task / Document のいずれかになりうる思いつきを Inbox に入れる。どれにもならない単なるメモは入れない。',
+  list_inbox_items: 'Inbox Item を状態で絞り込んで一覧する。既定では未整理の Item を返す。',
+  update_inbox_item: 'untriaged の Inbox Item の本文を更新する。更新前に読み、version を渡す。',
+  convert_inbox_item:
+    'untriaged の Inbox Item を Project / Task / Document に変換する。変換先の作成項目を指定し、Item は整理済みになる。',
+  archive_inbox_item:
+    '基準に合わない untriaged の Inbox Item を archive する。archive は取り消せない。',
   list_projects: 'Project を状態で絞り込んで一覧する。',
   create_project:
     'Project を作る。概要、エージェント向け instructions、関連リポジトリ、文脈として参照する Document を必要に応じて指定する。',

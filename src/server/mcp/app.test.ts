@@ -153,7 +153,10 @@ describe('ツールの登録', () => {
     expect(await listTools(full)).toEqual([
       'add_task_comment',
       'archive_document',
+      'archive_inbox_item',
       'block_task',
+      'capture_inbox_item',
+      'convert_inbox_item',
       'create_document',
       'create_project',
       'create_task',
@@ -162,24 +165,31 @@ describe('ツールの登録', () => {
       'get_task',
       'list_actionable_tasks',
       'list_actors',
+      'list_inbox_items',
       'list_projects',
       'list_tasks',
       'request_task_review',
       'return_task_to_todo',
       'start_task',
       'update_document',
+      'update_inbox_item',
       'update_project',
       'update_task',
     ])
     // ツールが1つもなければ、SDK は tools の機能自体を宣言しない
     expect((await listTools(readOnly)) ?? []).toEqual([
+      'archive_inbox_item',
+      'capture_inbox_item',
+      'convert_inbox_item',
       'create_project',
       'get_project_context',
       'get_task',
       'list_actionable_tasks',
       'list_actors',
+      'list_inbox_items',
       'list_projects',
       'list_tasks',
+      'update_inbox_item',
       'update_project',
     ])
   })
@@ -248,6 +258,28 @@ describe('ツールの呼び出し', () => {
 
     expect(result.isError).toBe(false)
     expect(JSON.parse(result.text)).toMatchObject({ id: 'document:1', tags: ['k8s'] })
+  })
+
+  it('Inbox Item を Task に変換し、ネストした Project ID を MCP 形式で受け取る', async () => {
+    const token = insertToken(database, insertActor(database))
+    const project = JSON.parse(
+      (await callTool(token, 'create_project', { name: 'Project' })).text,
+    ) as {
+      id: string
+    }
+    const item = JSON.parse(
+      (await callTool(token, 'capture_inbox_item', { content: '思いつき' })).text,
+    ) as {
+      id: string
+    }
+
+    const converted = await callTool(token, 'convert_inbox_item', {
+      id: item.id,
+      target: { targetType: 'task', target: { title: 'Task', projectId: project.id } },
+    })
+
+    expect(converted.isError).toBe(false)
+    expect(JSON.parse(converted.text)).toMatchObject({ id: item.id, status: 'triaged' })
   })
 
   it('Document を取得・更新・archive できる', async () => {

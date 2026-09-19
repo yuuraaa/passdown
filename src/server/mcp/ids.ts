@@ -24,6 +24,16 @@ function convertField(field: z.ZodType): z.ZodType {
     converted = convertField(field.unwrap() as z.ZodType).optional()
   } else if (field instanceof z.ZodArray) {
     converted = z.array(convertField(field.element as z.ZodType))
+  } else if (field instanceof z.ZodObject) {
+    converted = toMcpInputSchema(field)
+  } else if (field instanceof z.ZodDiscriminatedUnion) {
+    converted = z.union(
+      field.options.map((option) => toMcpInputSchema(option as z.ZodObject)) as [
+        z.ZodObject,
+        z.ZodObject,
+        ...z.ZodObject[],
+      ],
+    )
   } else {
     const entityType = entityTypeOf(field)
     converted = entityType ? entityIdString(entityType) : field

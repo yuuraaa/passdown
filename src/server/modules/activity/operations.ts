@@ -6,7 +6,6 @@ import {
   activityRecordInput,
   actorActivitiesInput,
   documentActivitiesInput,
-  inboxItemActivitiesInput,
   projectActivitiesInput,
   taskActivitiesInput,
   type ActivityRecordInput,
@@ -109,15 +108,13 @@ export const getDocumentActivities = defineOperation({
 })
 
 /** Inbox Item の Activity を読む（Web UI 専用）。変換先の付加は Inbox モジュールが行う。 */
-export const getInboxItemActivities = defineOperation({
-  name: 'get_inbox_item_activities',
-  routes: ['web'],
-  requires: [],
-  returns: [],
-  entity: 'inbox_item',
-  input: inboxItemActivitiesInput,
-  run: (ctx, input): ActivityPage => readEntityPage(ctx, 'inbox_item', input.inboxItemId, input),
-})
+/** Inbox モジュールが変換先を付加する前の Activity を読む。 */
+export function readInboxItemActivities(
+  ctx: Ctx,
+  input: { inboxItemId: number; limit: number; offset: number },
+): ActivityPage {
+  return readEntityPage(ctx, 'inbox_item', input.inboxItemId, input)
+}
 
 /** Project 画面用に、その Project 自身と所属 Task の Activity を読む（Web UI 専用）。 */
 export const getProjectActivities = defineOperation({
