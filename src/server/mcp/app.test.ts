@@ -5,9 +5,11 @@ import { defineOperation } from '../core/operation.js'
 import type { Database } from '../db/connection.js'
 import { activities } from '../modules/activity/schema.js'
 import { createTaskInput } from '../modules/task/index.js'
+import { archiveDocument, createDocument } from '../modules/document/index.js'
 import { createTestDatabase } from '../testing/db.js'
 import {
   FIXED_NOW,
+  ctxFor,
   insertActor,
   insertProject,
   insertSession,
@@ -18,7 +20,11 @@ import { createMcpApp } from './app.js'
 
 type RpcResponse = {
   result?: {
-    tools?: { name: string; inputSchema: { properties: Record<string, unknown> } }[]
+    tools?: {
+      name: string
+      description: string
+      inputSchema: { properties: Record<string, unknown> }
+    }[]
     content?: { type: 'text'; text: string }[]
     isError?: boolean
   }
@@ -124,6 +130,19 @@ describe('認証', () => {
 })
 
 describe('ツールの登録', () => {
+  it('Document の作成・更新ツールには archived を含む既存タグを示す', async () => {
+    const owner = insertActor(database)
+    const document = createDocument(ctxFor(database, owner), { title: '資料', tags: [' K8S '] })
+    archiveDocument(ctxFor(database, owner), { id: document.id })
+    const token = insertToken(database, owner)
+
+    const result = await rpc(token, 'tools/list', {})
+    const tools = result.result?.tools ?? []
+    for (const name of ['create_document', 'update_document']) {
+      expect(tools.find((tool) => tool.name === name)?.description).toContain('既存のタグ: k8s')
+    }
+  })
+
   it('権限に合うツールだけを表示する', async () => {
     const full = insertToken(database, insertActor(database))
     const readOnly = insertToken(
@@ -186,6 +205,33 @@ describe('ツールの呼び出し', () => {
 
     expect(result.isError).toBe(false)
     expect(JSON.parse(result.text)).toMatchObject({ id: 'document:1', tags: ['k8s'] })
+  })
+
+  it('Document を取得・更新・archive できる', async () => {
+    const token = insertToken(database, insertActor(database))
+    const created = await callTool(token, 'create_document', { title: '資料', content: '旧本文' })
+    const document = JSON.parse(created.text) as { id: string; version: number }
+
+    expect(
+      JSON.parse((await callTool(token, 'get_document', { id: document.id })).text),
+    ).toMatchObject({
+      id: document.id,
+      content: '旧本文',
+    })
+    const updated = await callTool(token, 'update_document', {
+      id: document.id,
+      title: '更新資料',
+      content: '新本文',
+      tags: [' K8S '],
+      version: document.version,
+    })
+    expect(JSON.parse(updated.text)).toMatchObject({ version: 2, tags: ['k8s'] })
+    expect(
+      JSON.parse((await callTool(token, 'archive_document', { id: document.id })).text),
+    ).toMatchObject({
+      status: 'archived',
+      version: 3,
+    })
   })
 
   it('Task を作り、結果の id を `<種類>:<id>` で返し、経路を mcp として記録する', async () => {

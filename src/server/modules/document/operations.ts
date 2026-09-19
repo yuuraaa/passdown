@@ -92,6 +92,16 @@ export function readDocumentsByIds(ctx: Ctx, ids: readonly number[]): DocumentDe
     .map((document) => detail(ctx, document))
 }
 
+/** 既存タグを名前順で返す。archived の Document のタグも含む（F-DOC-02）。 */
+export function getExistingDocumentTags(ctx: Ctx): string[] {
+  return ctx.db
+    .selectDistinct({ tag: documentTags.tag })
+    .from(documentTags)
+    .orderBy(asc(documentTags.tag))
+    .all()
+    .map((row) => row.tag)
+}
+
 export const listDocuments = defineOperation({
   name: 'list_documents',
   routes: ['web'],
@@ -259,11 +269,5 @@ export const listDocumentTags = defineOperation({
   returns: [],
   entity: 'document',
   input: listDocumentTagsInput,
-  run: (ctx) =>
-    ctx.db
-      .selectDistinct({ tag: documentTags.tag })
-      .from(documentTags)
-      .orderBy(asc(documentTags.tag))
-      .all()
-      .map((row) => row.tag),
+  run: (ctx) => getExistingDocumentTags(ctx),
 })

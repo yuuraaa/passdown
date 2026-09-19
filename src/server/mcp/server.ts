@@ -9,7 +9,8 @@ import {
   type McpOperation,
 } from '../core/operation.js'
 import { formatDatetime } from '../core/time.js'
-import { toolDescriptions } from './descriptions.js'
+import { getExistingDocumentTags } from '../modules/document/index.js'
+import { descriptionWithDocumentTags, toolDescriptions } from './descriptions.js'
 import { toMcpIds, toMcpInputSchema } from './ids.js'
 
 export type McpDeps = {
@@ -37,9 +38,21 @@ function registerOperation(server: McpServer, deps: McpDeps, actor: Actor, op: M
   if (!description) {
     throw new Error(`MCP のツールの説明がありません: ${op.name}`)
   }
+  const described =
+    op.name === 'create_document' || op.name === 'update_document'
+      ? descriptionWithDocumentTags(
+          op.name,
+          getExistingDocumentTags({
+            db: deps.db,
+            actor,
+            source: 'mcp',
+            now: formatDatetime(deps.now()),
+          }),
+        )
+      : description
   server.registerTool(
     op.name,
-    { description, inputSchema: toMcpInputSchema(op.input as z.ZodObject) },
+    { description: described, inputSchema: toMcpInputSchema(op.input as z.ZodObject) },
     (input: unknown) => {
       const ctx: Ctx = { db: deps.db, actor, source: 'mcp', now: formatDatetime(deps.now()) }
       try {

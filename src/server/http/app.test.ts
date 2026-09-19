@@ -180,6 +180,18 @@ describe('Document', () => {
     const document = (await created.json()) as { id: number; version: number; tags: string[] }
     expect(document.tags).toEqual(['k8s'])
 
+    const listed = await app.request('/api/documents?limit=1&offset=0', {
+      headers: { Cookie: cookie },
+    })
+    expect(await listed.json()).toMatchObject({
+      total: 1,
+      items: [{ id: document.id, title: '運用資料' }],
+    })
+    const detail = await app.request(`/api/documents/${document.id}`, {
+      headers: { Cookie: cookie },
+    })
+    expect(await detail.json()).toMatchObject({ id: document.id, content: '本文', tags: ['k8s'] })
+
     const updated = await app.request(`/api/documents/${document.id}`, {
       method: 'PATCH',
       headers: { Cookie: cookie, 'Content-Type': 'application/json' },
@@ -201,6 +213,14 @@ describe('Document', () => {
     })
     expect(archived.status).toBe(200)
     expect(await archived.json()).toMatchObject({ status: 'archived', version: 3 })
+
+    const invalid = await app.request('/api/documents', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: '', tags: ['　'] }),
+    })
+    expect(invalid.status).toBe(400)
+    expect((await errorOf(invalid)).type).toBe('invalid_input')
   })
 })
 

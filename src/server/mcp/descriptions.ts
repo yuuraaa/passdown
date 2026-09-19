@@ -16,3 +16,16 @@ export const toolDescriptions: Record<string, string> = {
   archive_document:
     '不要になった active な Document を archive する。archive は取り消せず、以後その Document は更新できない。',
 }
+
+/** Document を作成・更新するエージェントに、表記を揃えるための既存タグを示す。 */
+export function descriptionWithDocumentTags(name: string, tags: readonly string[]): string {
+  const description = toolDescriptions[name]
+  if (!description) {
+    throw new Error(`MCP のツールの説明がありません: ${name}`)
+  }
+  if (name !== 'create_document' && name !== 'update_document') {
+    return description
+  }
+  const existing = tags.length === 0 ? 'なし' : tags.join('、')
+  return `${description}\n既存のタグ: ${existing}`
+}

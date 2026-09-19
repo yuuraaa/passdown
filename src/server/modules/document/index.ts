@@ -7,6 +7,7 @@ export {
   getActiveDocuments,
   getDocument,
   getDocumentOperation,
+  getExistingDocumentTags,
   listDocumentTags,
   listDocuments,
   readDocumentsByIds,
