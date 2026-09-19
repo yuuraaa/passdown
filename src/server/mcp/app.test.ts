@@ -126,9 +126,20 @@ describe('認証', () => {
 describe('ツールの登録', () => {
   it('権限に合うツールだけを表示する', async () => {
     const full = insertToken(database, insertActor(database))
-    const readOnly = insertToken(database, insertActor(database, { permissions: { task: 'read' } }))
+    const readOnly = insertToken(
+      database,
+      insertActor(database, { permissions: { task: 'read', document: 'none' } }),
+    )
 
-    expect(await listTools(full)).toEqual(['create_task', 'list_actors', 'start_task'])
+    expect(await listTools(full)).toEqual([
+      'archive_document',
+      'create_document',
+      'create_task',
+      'get_document',
+      'list_actors',
+      'start_task',
+      'update_document',
+    ])
     // ツールが1つもなければ、SDK は tools の機能自体を宣言しない
     expect((await listTools(readOnly)) ?? []).toEqual(['list_actors'])
   })
@@ -164,6 +175,19 @@ describe('ツールの登録', () => {
 })
 
 describe('ツールの呼び出し', () => {
+  it('Document を作成して MCP 形式の id とタグを返す', async () => {
+    const token = insertToken(database, insertActor(database))
+
+    const result = await callTool(token, 'create_document', {
+      title: '運用資料',
+      content: '本文',
+      tags: [' K8S '],
+    })
+
+    expect(result.isError).toBe(false)
+    expect(JSON.parse(result.text)).toMatchObject({ id: 'document:1', tags: ['k8s'] })
+  })
+
   it('Task を作り、結果の id を `<種類>:<id>` で返し、経路を mcp として記録する', async () => {
     const actor = insertActor(database)
     const token = insertToken(database, actor)

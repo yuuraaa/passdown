@@ -2,6 +2,7 @@ import type { Actor, Ctx, Resource } from '../core/operation.js'
 import type { Database } from '../db/connection.js'
 import { recordActivities } from '../modules/activity/index.js'
 import { createTask } from '../modules/task/index.js'
+import { createDocument } from '../modules/document/index.js'
 import { ctxFor, insertActor, insertProject, insertToken } from './fixtures.js'
 import { tokens } from '../modules/auth/schema.js'
 
@@ -125,6 +126,40 @@ export const scenarios: Record<string, Scenario> = {
     arrange: ({ ownerCtx }) => {
       const task = createTask.withoutPermissionCheck(ownerCtx, { title: '着手する Task' })
       return { id: task.id }
+    },
+  },
+  list_documents: {
+    arrange: () => ({}),
+  },
+  get_document: {
+    arrange: ({ ownerCtx }) => ({
+      id: createDocument.withoutPermissionCheck(ownerCtx, { title: 'Document' }).id,
+    }),
+  },
+  create_document: {
+    arrange: () => ({ title: 'Document', tags: ['設計'] }),
+  },
+  update_document: {
+    arrange: ({ ownerCtx }) => {
+      const document = createDocument.withoutPermissionCheck(ownerCtx, { title: 'Document' })
+      return {
+        id: document.id,
+        title: '更新済み',
+        content: '本文',
+        tags: ['設計'],
+        version: document.version,
+      }
+    },
+  },
+  archive_document: {
+    arrange: ({ ownerCtx }) => ({
+      id: createDocument.withoutPermissionCheck(ownerCtx, { title: 'Document' }).id,
+    }),
+  },
+  list_document_tags: {
+    arrange: ({ ownerCtx }) => {
+      createDocument.withoutPermissionCheck(ownerCtx, { title: 'Document', tags: ['設計'] })
+      return {}
     },
   },
 }

@@ -169,6 +169,41 @@ describe('Task', () => {
   })
 })
 
+describe('Document', () => {
+  it('作成・更新・archive と既存タグ一覧を REST API で利用できる', async () => {
+    const created = await app.request('/api/documents', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: '運用資料', content: '本文', tags: [' K8S '] }),
+    })
+    expect(created.status).toBe(200)
+    const document = (await created.json()) as { id: number; version: number; tags: string[] }
+    expect(document.tags).toEqual(['k8s'])
+
+    const updated = await app.request(`/api/documents/${document.id}`, {
+      method: 'PATCH',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: '更新資料',
+        content: '更新本文',
+        tags: ['設計'],
+        version: document.version,
+      }),
+    })
+    expect(updated.status).toBe(200)
+
+    const tags = await app.request('/api/document-tags', { headers: { Cookie: cookie } })
+    expect(await tags.json()).toEqual(['設計'])
+
+    const archived = await app.request(`/api/documents/${document.id}/archive`, {
+      method: 'POST',
+      headers: { Cookie: cookie },
+    })
+    expect(archived.status).toBe(200)
+    expect(await archived.json()).toMatchObject({ status: 'archived', version: 3 })
+  })
+})
+
 describe('Activity', () => {
   it('ログインした人間が Task の Activity を取得できる', async () => {
     const created = await client().tasks.$post({ json: { title: '履歴を確認する Task' } })

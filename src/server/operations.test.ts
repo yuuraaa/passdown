@@ -44,9 +44,12 @@ beforeEach(async () => {
 
 it('一覧に操作が集まっている', () => {
   expect(operations.map((op) => op.name).sort()).toEqual([
+    'archive_document',
     'create_agent_actor',
+    'create_document',
     'create_task',
     'get_actor_activities',
+    'get_document',
     'get_document_activities',
     'get_inbox_item_activities',
     'get_project_activities',
@@ -54,9 +57,12 @@ it('一覧に操作が集まっている', () => {
     'issue_token',
     'list_actor_tokens',
     'list_actors',
+    'list_document_tags',
+    'list_documents',
     'revoke_token',
     'start_task',
     'update_agent_permissions',
+    'update_document',
   ])
 })
 
