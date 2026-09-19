@@ -88,7 +88,22 @@ export function toMcpIds(value: unknown, entity: EntityType): unknown {
       if (key === 'items') {
         return [key, toMcpIds(v, entity)]
       }
+      if (key === 'matchedComments' && Array.isArray(v)) {
+        return [
+          key,
+          (v as unknown[]).map((comment) =>
+            comment !== null &&
+            typeof comment === 'object' &&
+            typeof (comment as { id?: unknown }).id === 'number'
+              ? { ...comment, id: `comment:${(comment as { id: number }).id}` }
+              : comment,
+          ),
+        ]
+      }
       if (key === 'parent' || key === 'children') {
+        return [key, toMcpIds(v, 'task')]
+      }
+      if (key === 'tasks') {
         return [key, toMcpIds(v, 'task')]
       }
       if (key === 'documents') {

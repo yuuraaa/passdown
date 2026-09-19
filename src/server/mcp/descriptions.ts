@@ -42,6 +42,8 @@ export const toolDescriptions: Record<string, string> = {
     'active な Document のタイトル・本文・タグを更新する。更新前に読み、返された version を渡す。タグは既存の表記に揃える。',
   archive_document:
     '不要になった active な Document を archive する。archive は取り消せず、以後その Document は更新できない。',
+  search:
+    'Task（コメントを含む）と Document を横断して検索する。キーワードは空白で区切り、すべての語に部分一致するものを返す。Project・タグ・Actor・状態・日時でも絞り込める。',
 }
 
 /** Document を作成・更新するエージェントに、表記を揃えるための既存タグを示す。 */

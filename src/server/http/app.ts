@@ -14,6 +14,7 @@ import { documentRoutes, documentTagRoutes } from './documents.js'
 import { sessionRoutes } from './sessions.js'
 import { projectRoutes } from './projects.js'
 import { inboxItemRoutes } from './inbox.js'
+import { searchRoutes } from './search.js'
 
 /** REST API（/api）。Web UI 専用で、ログインのセッションだけを受け付ける（設計書 7章） */
 export function createApi(deps: RouteDeps) {
@@ -28,6 +29,7 @@ export function createApi(deps: RouteDeps) {
     .route('/inbox-items', inboxItemRoutes(deps).route('/', inboxItemActivityRoutes(deps)))
     .route('/projects', projectRoutes(deps).route('/', projectActivityRoutes(deps)))
     .route('/tasks', taskRoutes(deps))
+    .route('/search', searchRoutes(deps))
 }
 
 /** Web UI が Hono RPC で使う型（設計書 4.8） */
