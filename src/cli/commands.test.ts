@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { Database } from '../server/db/connection.js'
 import { createTestDatabase } from '../server/testing/db.js'
 import { actors, humanCredentials } from '../server/modules/auth/schema.js'
-import { runCli, type CliIo } from './index.js'
+import { runCli, type CliIo } from './commands.js'
 
 class FakeIo implements CliIo {
   isTTY = true
