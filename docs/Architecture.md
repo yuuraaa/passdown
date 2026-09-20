@@ -1234,6 +1234,7 @@ Web UI 専用の経路（1章）。ログインのセッションだけを受け
 |---|---|
 | `GET /api/inbox-items` | `list_inbox_items` |
 | `POST /api/inbox-items` | `capture_inbox_item` |
+| `GET /api/inbox-items/:id` | Inbox Item を1件取得（Inbox Item 画面） |
 | `PATCH /api/inbox-items/:id` | `update_inbox_item` |
 | `POST /api/inbox-items/:id/convert` | `convert_inbox_item` |
 | `POST /api/inbox-items/:id/archive` | `archive_inbox_item` |
