@@ -5,6 +5,7 @@ import {
   captureInboxItemInput,
   convertInboxItem,
   convertInboxItemInput,
+  getInboxItemOperation,
   listInboxItems,
   listInboxItemsInput,
   updateInboxItem,
@@ -16,6 +17,7 @@ import { idParam, zValidator } from './validator.js'
 
 export function inboxItemRoutes(deps: RouteDeps) {
   const list = expose(listInboxItems)
+  const get = expose(getInboxItemOperation)
   const capture = expose(captureInboxItem)
   const update = expose(updateInboxItem)
   const convert = expose(convertInboxItem)
@@ -27,6 +29,9 @@ export function inboxItemRoutes(deps: RouteDeps) {
     )
     .post('/', zValidator('json', captureInboxItemInput), (c) =>
       c.json(capture(webCtx(deps, c), c.req.valid('json')), 200),
+    )
+    .get('/:id', zValidator('param', idParam), (c) =>
+      c.json(get(webCtx(deps, c), c.req.valid('param')), 200),
     )
     .patch(
       '/:id',

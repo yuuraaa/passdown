@@ -16,6 +16,7 @@ import {
   archiveInboxItemInput,
   captureInboxItemInput,
   convertInboxItemInput,
+  getInboxItemInput,
   listInboxItemsInput,
   updateInboxItemInput,
 } from './inputs.js'
@@ -92,6 +93,17 @@ export const listInboxItems = defineOperation({
     const total = ctx.db.select({ value: count() }).from(inboxItems).where(where).get()?.value ?? 0
     return { items, total }
   },
+})
+
+/** Inbox Item 詳細画面で、状態に関係なく1件を返す。 */
+export const getInboxItemOperation = defineOperation({
+  name: 'get_inbox_item',
+  routes: ['web'],
+  requires: [['inbox', 'read']],
+  returns: [],
+  entity: 'inbox_item',
+  input: getInboxItemInput,
+  run: (ctx, input) => readInboxItem(ctx, input.id),
 })
 
 export const captureInboxItem = defineOperation({

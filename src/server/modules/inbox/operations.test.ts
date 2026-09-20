@@ -14,6 +14,7 @@ import {
   archiveInboxItem,
   captureInboxItem,
   convertInboxItem,
+  getInboxItemOperation,
   getInboxItemActivities,
   listInboxItems,
   updateInboxItem,
@@ -47,6 +48,30 @@ describe('Inbox Item の操作', () => {
     expect(listInboxItems(ctx, { status: 'archived' }).items).toMatchObject([
       { id: first.id, content: '最初' },
     ])
+  })
+
+  it('状態に関係なく ID 指定で1件取得する', () => {
+    const untriaged = capture('未整理')
+    const triaged = capture('整理済み')
+    const archived = capture('アーカイブ済み')
+    convertInboxItem(ctx, {
+      id: triaged.id,
+      target: { targetType: 'task', target: { title: '変換先' } },
+    })
+    archiveInboxItem(ctx, { id: archived.id })
+
+    expect(getInboxItemOperation(ctx, { id: untriaged.id })).toMatchObject({
+      id: untriaged.id,
+      status: 'untriaged',
+    })
+    expect(getInboxItemOperation(ctx, { id: triaged.id })).toMatchObject({
+      id: triaged.id,
+      status: 'triaged',
+    })
+    expect(getInboxItemOperation(ctx, { id: archived.id })).toMatchObject({
+      id: archived.id,
+      status: 'archived',
+    })
   })
 
   it('本文を version 付きで更新し、競合時は何も書かない', () => {

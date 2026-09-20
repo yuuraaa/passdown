@@ -404,6 +404,11 @@ describe('Inbox', () => {
     expect(
       await (await app.request('/api/inbox-items', { headers: { Cookie: cookie } })).json(),
     ).toMatchObject({ total: 1, items: [{ id: item.id, status: 'untriaged' }] })
+    expect(
+      await (
+        await app.request(`/api/inbox-items/${item.id}`, { headers: { Cookie: cookie } })
+      ).json(),
+    ).toMatchObject({ id: item.id, content: '思いつき', status: 'untriaged' })
     const updated = await app.request(`/api/inbox-items/${item.id}`, {
       method: 'PATCH',
       headers: { Cookie: cookie, 'Content-Type': 'application/json' },
@@ -419,6 +424,10 @@ describe('Inbox', () => {
         })
       ).status,
     ).toBe(200)
+
+    const missing = await app.request('/api/inbox-items/999', { headers: { Cookie: cookie } })
+    expect(missing.status).toBe(404)
+    expect((await errorOf(missing)).type).toBe('not_found')
 
     const archived = await app.request('/api/inbox-items', {
       method: 'POST',

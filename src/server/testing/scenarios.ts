@@ -162,6 +162,11 @@ export const scenarios: Record<string, Scenario> = {
     },
   },
   list_inbox_items: { arrange: () => ({}) },
+  get_inbox_item: {
+    arrange: ({ ownerCtx }) => ({
+      id: captureInboxItem.withoutPermissionCheck(ownerCtx, { content: '読む Inbox Item' }).id,
+    }),
+  },
   capture_inbox_item: { arrange: () => ({ content: 'Inbox Item' }) },
   update_inbox_item: {
     arrange: ({ ownerCtx }) => {
