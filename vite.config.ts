@@ -1,4 +1,5 @@
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vitest/config'
 
 // Web UI のビルドは src/web を root にする（4.8）。
@@ -9,7 +10,7 @@ export default defineConfig({
     outDir: '../../dist/web',
     emptyOutDir: true,
   },
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   server: {
     // コンテナの中では 3000 で待ち受ける（2.9）
     host: true,
