@@ -15,6 +15,7 @@ import { activities } from './schema.js'
 export type Activity = typeof activities.$inferSelect
 export type ActivityRecord = ActivityRecordInput
 export type ActivityPage = { items: Activity[]; total: number }
+export type TaskStatusChange = { before: string; after: string }
 
 /**
  * Activity を記録する（設計書 4.9）。Actor・経路・日時は ctx の値をそのまま使う。
@@ -38,6 +39,28 @@ export function recordActivities(ctx: Ctx, records: readonly ActivityRecord[]): 
       )
       .run()
   })
+}
+
+/** Task 一覧の派生表示用に、各 Task の最後の状態遷移をまとめて読む。 */
+export function getLastTaskStatusChanges(
+  ctx: Ctx,
+  taskIds: readonly number[],
+): Map<number, TaskStatusChange> {
+  const changes = new Map<number, TaskStatusChange>()
+  if (taskIds.length === 0) return changes
+  const taskActivities = ctx.db
+    .select({ entityId: activities.entityId, before: activities.before, after: activities.after })
+    .from(activities)
+    .where(and(eq(activities.entityType, 'task'), inArray(activities.entityId, [...taskIds])))
+    .orderBy(asc(activities.id))
+    .all()
+  for (const activity of taskActivities) {
+    const before = activity.before.status
+    const after = activity.after.status
+    if (typeof before === 'string' && typeof after === 'string')
+      changes.set(activity.entityId, { before, after })
+  }
+  return changes
 }
 
 function readPage(ctx: Ctx, where: SQL, page: { limit: number; offset: number }): ActivityPage {

@@ -1,7 +1,11 @@
 import { and, asc, count, eq, gte, inArray, lte, notInArray, or, sql } from 'drizzle-orm'
 import { ConflictError, NotAllowedError, NotFoundError } from '../../core/errors.js'
 import { hasPermission, type Ctx, defineOperation } from '../../core/operation.js'
-import { type ActivityRecord, recordActivities } from '../activity/index.js'
+import {
+  getLastTaskStatusChanges,
+  type ActivityRecord,
+  recordActivities,
+} from '../activity/index.js'
 import { assertActorExists } from '../auth/index.js'
 import { getDocument, readDocumentsByIds } from '../document/index.js'
 import { getProjectStatus } from '../project/index.js'
@@ -52,6 +56,10 @@ export type TaskDetail = Task & {
   documents: ReturnType<typeof getDocument>[]
   parent: Pick<Task, 'id' | 'title' | 'description' | 'acceptanceCriteria'> | null
   children: Pick<Task, 'id' | 'title' | 'status'>[]
+}
+export type TaskListItem = Task & {
+  allChildrenFinished: boolean
+  returnedFrom: 'blocked' | 'review' | null
 }
 
 function readTask(ctx: Ctx, id: number): Task {
@@ -445,6 +453,40 @@ export const listTasks = defineOperation({
       .limit(input.limit)
       .offset(input.offset)
       .all()
+    const taskIds = items.map((task) => task.id)
+    const children =
+      taskIds.length === 0
+        ? []
+        : ctx.db
+            .select({ parentId: tasks.parentId, status: tasks.status })
+            .from(tasks)
+            .where(inArray(tasks.parentId, taskIds))
+            .all()
+    const childStates = new Map<number, TaskStatus[]>()
+    for (const child of children) {
+      if (child.parentId === null) continue
+      const states = childStates.get(child.parentId) ?? []
+      states.push(child.status)
+      childStates.set(child.parentId, states)
+    }
+
+    const lastStatusChanges = getLastTaskStatusChanges(ctx, taskIds)
+
+    const listItems: TaskListItem[] = items.map((task) => {
+      const childStatuses = childStates.get(task.id) ?? []
+      const change = lastStatusChanges.get(task.id)
+      return {
+        ...task,
+        allChildrenFinished:
+          childStatuses.length > 0 &&
+          childStatuses.every((status) => status === 'done' || status === 'cancelled'),
+        returnedFrom:
+          change?.after === 'todo' && (change.before === 'blocked' || change.before === 'review')
+            ? change.before
+            : null,
+      }
+    })
+
     const total = ctx.db.select({ value: count() }).from(tasks).where(where).get()?.value ?? 0
     const base = and(
       input.projectId === undefined ? undefined : eq(tasks.projectId, input.projectId),
@@ -459,7 +501,7 @@ export const listTasks = defineOperation({
         .all()
         .map((x) => [x.status, x.value]),
     )
-    return { items, total, statusCounts }
+    return { items: listItems, total, statusCounts }
   },
 })
 export const listActionableTasks = defineOperation({
