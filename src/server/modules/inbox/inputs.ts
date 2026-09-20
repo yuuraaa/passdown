@@ -17,6 +17,10 @@ export const listInboxItemsInput = page.extend({
   status: z.enum(inboxItemStatuses).default('untriaged').describe('表示する状態。既定は untriaged'),
 })
 
+export const getInboxItemInput = z.object({
+  id: entityId('inbox_item').describe('取得する Inbox Item'),
+})
+
 export const captureInboxItemInput = z.object({
   content: z
     .string()
