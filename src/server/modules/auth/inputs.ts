@@ -31,3 +31,16 @@ export const loginInput = z.object({
   loginName: z.string().trim().min(1, '空にできません').max(100),
   password: z.string().min(1, '空にできません').max(1024),
 })
+
+/** CLI だけが使う human アカウントの入力。Web・MCP の operation にはしない。 */
+export const createHumanAccountInput = z.object({
+  loginName: z.string().trim().min(1, '空にできません').max(100),
+  name: actorName,
+  password: z.string().min(1, '空にできません').max(1024),
+})
+
+/** CLI だけが使うパスワード再設定の入力。 */
+export const resetHumanPasswordInput = z.object({
+  loginName: z.string().trim().min(1, '空にできません').max(100),
+  password: z.string().min(1, '空にできません').max(1024),
+})

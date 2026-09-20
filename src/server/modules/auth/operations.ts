@@ -7,8 +7,10 @@ import { recordActivities } from '../activity/index.js'
 import {
   actorIdInput,
   createAgentActorInput,
+  createHumanAccountInput,
   listActorsInput,
   loginInput,
+  resetHumanPasswordInput,
   tokenIdInput,
   updateAgentPermissionsInput,
 } from './inputs.js'
@@ -22,11 +24,11 @@ import {
 } from './rules.js'
 import { actors, humanCredentials, sessions, tokens } from './schema.js'
 
-const SCRYPT_N = 2 ** 15
+const SCRYPT_N = 2 ** 17
 const SCRYPT_R = 8
 const SCRYPT_P = 1
 const SCRYPT_KEYLEN = 32
-const SCRYPT_MAXMEM = 64 * 1024 * 1024
+const SCRYPT_MAXMEM = 192 * 1024 * 1024
 
 export type AuthActor = typeof actors.$inferSelect
 
@@ -117,6 +119,50 @@ export async function hashPassword(password: string): Promise<string> {
     maxmem: SCRYPT_MAXMEM,
   })
   return `scrypt$${SCRYPT_N}$${SCRYPT_R}$${SCRYPT_P}$${salt.toString('base64url')}$${derived.toString('base64url')}`
+}
+
+/** CLI 専用。Activity を作らず、Actor と credential を同じトランザクションで追加する。 */
+export async function createHumanAccount(db: Db, input: unknown): Promise<AuthActor> {
+  const parsed = createHumanAccountInput.parse(input)
+  const passwordHash = await hashPassword(parsed.password)
+  return db.transaction((tx) => {
+    const actor = tx
+      .insert(actors)
+      .values({
+        actorType: 'human',
+        name: parsed.name,
+        permProject: 'readwrite',
+        permTask: 'readwrite',
+        permDocument: 'readwrite',
+        permInbox: 'readwrite',
+      })
+      .returning()
+      .get()
+    tx.insert(humanCredentials)
+      .values({ actorId: actor.id, loginName: parsed.loginName, passwordHash })
+      .run()
+    return actor
+  })
+}
+
+/** CLI 専用。対象の全セッションを、ハッシュ更新と同じトランザクションで削除する。 */
+export async function resetHumanPassword(db: Db, input: unknown): Promise<void> {
+  const parsed = resetHumanPasswordInput.parse(input)
+  const passwordHash = await hashPassword(parsed.password)
+  db.transaction((tx) => {
+    const credential = tx
+      .select({ actorId: humanCredentials.actorId })
+      .from(humanCredentials)
+      .innerJoin(actors, eq(humanCredentials.actorId, actors.id))
+      .where(and(eq(humanCredentials.loginName, parsed.loginName), eq(actors.actorType, 'human')))
+      .get()
+    if (!credential) throw new NotFoundError(`loginName:${parsed.loginName} が見つかりません`)
+    tx.update(humanCredentials)
+      .set({ passwordHash })
+      .where(eq(humanCredentials.actorId, credential.actorId))
+      .run()
+    tx.delete(sessions).where(eq(sessions.actorId, credential.actorId)).run()
+  })
 }
 
 async function verifyPassword(password: string, encoded: string): Promise<boolean> {
