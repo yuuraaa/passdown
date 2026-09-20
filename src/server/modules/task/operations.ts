@@ -5,6 +5,7 @@ import { type ActivityRecord, recordActivities } from '../activity/index.js'
 import { assertActorExists } from '../auth/index.js'
 import { getDocument, readDocumentsByIds } from '../document/index.js'
 import { getProjectStatus } from '../project/index.js'
+import { escapeLikePattern } from '../search/index.js'
 import {
   addTaskCommentInput,
   approveTaskInput,
@@ -67,10 +68,6 @@ function readComments(ctx: Ctx, taskId: number): TaskComment[] {
     .all()
 }
 
-function escapeLike(word: string): string {
-  return `%${word.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
-}
-
 function taskSearchWhere(filter: TaskSearchFilter) {
   return and(
     inArray(tasks.status, [...filter.statuses]),
@@ -110,7 +107,7 @@ export function searchTasks(ctx: Ctx, filter: TaskSearchFilter): TaskSearchPage 
   }
 
   for (const [wordIndex, word] of words.entries()) {
-    const pattern = escapeLike(word)
+    const pattern = escapeLikePattern(word)
     const taskRows = ctx.db
       .select({
         id: tasks.id,

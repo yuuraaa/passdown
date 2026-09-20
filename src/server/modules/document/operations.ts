@@ -3,6 +3,7 @@ import { ConflictError, NotAllowedError, NotFoundError } from '../../core/errors
 import { hasPermission, type Ctx, defineOperation } from '../../core/operation.js'
 import { type ActivityRecord, recordActivities } from '../activity/index.js'
 import { getProjectsReferencingDocument, type DocumentProjectReference } from '../project/index.js'
+import { escapeLikePattern } from '../search/index.js'
 import { getTasksReferencingDocument, type DocumentTaskReference } from '../task/index.js'
 import {
   archiveDocumentInput,
@@ -56,10 +57,6 @@ function readTags(ctx: Ctx, documentId: number): string[] {
     .map((row) => row.tag)
 }
 
-function escapeLike(word: string): string {
-  return `%${word.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
-}
-
 /** search モジュール向け。Document の検索SQLは Document モジュールに閉じる。 */
 export function searchDocuments(ctx: Ctx, filter: DocumentSearchFilter): DocumentSearchPage {
   if (filter.documentIds !== undefined && filter.documentIds.length === 0)
@@ -80,7 +77,7 @@ export function searchDocuments(ctx: Ctx, filter: DocumentSearchFilter): Documen
   const matched = new Map<number, DocumentSearchItem & { matchedWords: Set<number> }>()
   const words = filter.words.length === 0 ? [''] : filter.words
   for (const [wordIndex, word] of words.entries()) {
-    const pattern = escapeLike(word)
+    const pattern = escapeLikePattern(word)
     const rows = ctx.db
       .select({
         id: documents.id,
