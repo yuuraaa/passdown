@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: oklch(98% 0.005 250);
+  --color-surface: oklch(100% 0 0);
+  --color-ink: oklch(22% 0.02 240);
+  --color-muted: oklch(50% 0.018 240);
+  --color-line: oklch(90% 0.008 240);
+  --color-accent: oklch(58% 0.16 145);
+  --color-danger: oklch(56% 0.18 27);
+  --radius-ui: 0.5rem;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  html {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+  }
+  body {
+    margin: 0;
+    min-width: 320px;
+    font-family: system-ui, sans-serif;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 3px solid color-mix(in oklch, var(--color-accent) 35%, transparent);
+    outline-offset: 2px;
+  }
+}
