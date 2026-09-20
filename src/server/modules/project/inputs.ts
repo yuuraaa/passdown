@@ -10,9 +10,13 @@ const page = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 })
 export const listProjectsInput = page.extend({
+  // URL query では1件だけの `statuses=active` が文字列になるため、REST と MCP の共通出力を
+  // 保ったまま配列に正規化する。
   statuses: z
-    .array(z.enum(projectStatuses))
-    .min(1)
+    .preprocess(
+      (value) => (typeof value === 'string' ? [value] : value),
+      z.array(z.enum(projectStatuses)).min(1),
+    )
     .default([...projectStatuses]),
 })
 export const getProjectInput = z.object({ id: entityId('project') })

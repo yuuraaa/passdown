@@ -51,8 +51,10 @@ const page = z.object({
 
 export const listTasksInput = page.extend({
   statuses: z
-    .array(z.enum(taskStatuses))
-    .min(1)
+    .preprocess(
+      (value) => (typeof value === 'string' ? [value] : value),
+      z.array(z.enum(taskStatuses)).min(1),
+    )
     .default([...taskStatuses]),
   projectId: entityId('project').optional(),
   assigneeId: entityId('actor').optional(),
