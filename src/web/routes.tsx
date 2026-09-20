@@ -2,6 +2,7 @@ import { Navigate, RouterProvider, createBrowserRouter } from 'react-router'
 import { AppShell } from './app-shell.js'
 import { LoginPage, RequireSession } from './auth.js'
 import { Card, PageHeader } from './components/ui.js'
+import { DocumentDetailPage, DocumentsPage, NewDocumentPage } from './documents/documents.js'
 
 const routes = [
   { path: '/login', element: <LoginPage /> },
@@ -21,9 +22,9 @@ const routes = [
       { path: '/tasks', element: <Placeholder title="Tasks" /> },
       { path: '/tasks/new', element: <Placeholder title="Taskを作成" /> },
       { path: '/tasks/:id', element: <Placeholder title="Task" /> },
-      { path: '/documents', element: <Placeholder title="Documents" /> },
-      { path: '/documents/new', element: <Placeholder title="Documentを作成" /> },
-      { path: '/documents/:id', element: <Placeholder title="Document" /> },
+      { path: '/documents', element: <DocumentsPage /> },
+      { path: '/documents/new', element: <NewDocumentPage /> },
+      { path: '/documents/:id', element: <DocumentDetailPage /> },
       { path: '/search', element: <Placeholder title="検索" /> },
       { path: '/settings', element: <Navigate replace to="/settings/agents" /> },
       { path: '/settings/agents', element: <Placeholder title="Agent" /> },
