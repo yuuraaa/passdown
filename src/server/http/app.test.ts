@@ -141,6 +141,33 @@ describe('認証', () => {
     expect(await errorOf(res)).toMatchObject({ type: 'not_allowed' })
   })
 
+  it('agent Actor の現在の権限を取得でき、human と存在しない Actor は拒否する', async () => {
+    const agent = insertActor(database, {
+      name: 'Codex',
+      permissions: { project: 'read', task: 'readwrite', document: 'none', inbox: 'read' },
+    })
+
+    const detail = await app.request(`/api/actors/${agent.id}`, { headers: { Cookie: cookie } })
+    expect(detail.status).toBe(200)
+    expect(await detail.json()).toEqual({
+      id: agent.id,
+      name: 'Codex',
+      actorType: 'agent',
+      permissions: { project: 'read', task: 'readwrite', document: 'none', inbox: 'read' },
+    })
+
+    const human = await app.request(`/api/actors/${owner.id}`, { headers: { Cookie: cookie } })
+    expect(human.status).toBe(409)
+    expect(await errorOf(human)).toMatchObject({ type: 'not_allowed' })
+
+    const missing = await app.request('/api/actors/999', { headers: { Cookie: cookie } })
+    expect(missing.status).toBe(404)
+    expect(await errorOf(missing)).toMatchObject({ type: 'not_found' })
+
+    const anonymous = await app.request(`/api/actors/${agent.id}`)
+    expect(anonymous.status).toBe(401)
+  })
+
   it('ログインしていなければ 401', async () => {
     const res = await client({}).tasks.$post({ json: { title: 't' } })
     expect(res.status).toBe(401)

@@ -92,6 +92,9 @@ export const scenarios: Record<string, Scenario> = {
   list_actors: {
     arrange: () => ({}),
   },
+  get_agent_actor: {
+    arrange: ({ database }) => ({ id: insertActor(database).id }),
+  },
   create_agent_actor: {
     arrange: () => ({
       name: '実装エージェント',

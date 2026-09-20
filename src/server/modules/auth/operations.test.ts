@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { NotAllowedError } from '../../core/errors.js'
+import { NotAllowedError, NotFoundError } from '../../core/errors.js'
 import type { Ctx } from '../../core/operation.js'
 import { formatDatetime } from '../../core/time.js'
 import type { Database } from '../../db/connection.js'
@@ -12,6 +12,7 @@ import {
   authenticateToken,
   createHumanAccount,
   createAgentActor,
+  getAgentActor,
   issueToken,
   listActorTokens,
   listActors,
@@ -88,6 +89,25 @@ describe('agent Actor と Token', () => {
   it('担当候補は名前と種別だけを返す', () => {
     const result = listActors(ctx, {})
     expect(result).toEqual([{ id: ctx.actor.id, name: ctx.actor.name, actorType: 'human' }])
+  })
+
+  it('agent Actor の現在の権限を Settings 用に取得する', () => {
+    const agent = insertActor(database, {
+      name: 'Codex',
+      permissions: { project: 'read', task: 'readwrite', document: 'none', inbox: 'read' },
+    })
+
+    expect(getAgentActor(ctx, { id: agent.id })).toEqual({
+      id: agent.id,
+      name: 'Codex',
+      actorType: 'agent',
+      permissions: { project: 'read', task: 'readwrite', document: 'none', inbox: 'read' },
+    })
+  })
+
+  it('human または存在しない Actor の詳細取得を拒否する', () => {
+    expect(() => getAgentActor(ctx, { id: ctx.actor.id })).toThrow(NotAllowedError)
+    expect(() => getAgentActor(ctx, { id: 999 })).toThrow(NotFoundError)
   })
 })
 

@@ -59,6 +59,7 @@ it('一覧に操作が集まっている', () => {
     'create_project',
     'create_task',
     'get_actor_activities',
+    'get_agent_actor',
     'get_document',
     'get_document_activities',
     'get_document_references',
