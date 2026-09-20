@@ -2,20 +2,24 @@ import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { NotAllowedError } from '../../core/errors.js'
 import type { Ctx } from '../../core/operation.js'
+import { formatDatetime } from '../../core/time.js'
 import type { Database } from '../../db/connection.js'
 import { ctxFor, insertActor } from '../../testing/fixtures.js'
 import { expectRecorded } from '../../testing/recorded.js'
 import { activities } from '../activity/schema.js'
-import { tokens } from './schema.js'
+import { humanCredentials, sessions, tokens } from './schema.js'
 import {
   authenticateToken,
+  createHumanAccount,
   createAgentActor,
   issueToken,
   listActorTokens,
   listActors,
   LoginFailureTracker,
   revokeToken,
+  resetHumanPassword,
   updateAgentPermissions,
+  login,
 } from './operations.js'
 import { createTestDatabase } from '../../testing/db.js'
 
@@ -112,5 +116,93 @@ describe('LoginFailureTracker', () => {
     const now = new Date('2026-09-16T12:00:00.000+09:00')
     for (let count = 0; count < 8; count += 1) await tracker.fail('owner', now)
     expect(delays.at(-1)).toBe(30_000)
+  })
+})
+
+describe('CLI 用 human アカウント操作', () => {
+  it('human と credential を作成し、表示名・ハッシュ・ログインを確認できる', async () => {
+    const actor = await createHumanAccount(database.db, {
+      loginName: 'owner',
+      name: 'オーナー',
+      password: 'correct horse battery staple',
+    })
+    expect(actor).toMatchObject({ actorType: 'human', name: 'オーナー' })
+    expect(actor).toMatchObject({
+      permProject: 'readwrite',
+      permTask: 'readwrite',
+      permDocument: 'readwrite',
+      permInbox: 'readwrite',
+    })
+    const credential = database.db.select().from(humanCredentials).get()
+    expect(credential).toMatchObject({ actorId: actor.id, loginName: 'owner' })
+    expect(credential?.passwordHash).toMatch(/^scrypt\$131072\$8\$1\$/)
+    expect(credential?.passwordHash).not.toContain('correct horse battery staple')
+    await expect(
+      login(
+        database.db,
+        { loginName: 'owner', password: 'correct horse battery staple' },
+        formatDatetime(new Date('2026-09-16T03:00:00+09:00')),
+      ),
+    ).resolves.toMatchObject({
+      actor: { id: actor.id },
+    })
+    expect(database.db.select().from(activities).all()).toEqual([])
+  })
+
+  it('重複したログイン名では Actor も credential も追加しない', async () => {
+    await createHumanAccount(database.db, {
+      loginName: 'owner',
+      name: 'owner',
+      password: 'password',
+    })
+    await expect(
+      createHumanAccount(database.db, {
+        loginName: 'owner',
+        name: 'another',
+        password: 'password',
+      }),
+    ).rejects.toThrow()
+    expect(database.db.select().from(humanCredentials).all()).toHaveLength(1)
+    expect(database.db.select().from(activities).all()).toEqual([])
+    expect(database.db.select().from(sessions).all()).toEqual([])
+  })
+
+  it('パスワード再設定で全セッションを削除し、新しいパスワードだけを受け付ける', async () => {
+    const actor = await createHumanAccount(database.db, {
+      loginName: 'owner',
+      name: 'owner',
+      password: 'old-password',
+    })
+    const first = await login(
+      database.db,
+      { loginName: 'owner', password: 'old-password' },
+      formatDatetime(new Date('2026-09-16T03:00:00+09:00')),
+    )
+    const second = await login(
+      database.db,
+      { loginName: 'owner', password: 'old-password' },
+      formatDatetime(new Date('2026-09-16T03:01:00+09:00')),
+    )
+    expect(first?.actor.id).toBe(actor.id)
+    expect(second?.actor.id).toBe(actor.id)
+    await resetHumanPassword(database.db, { loginName: 'owner', password: 'new-password' })
+    expect(database.db.select().from(sessions).all()).toEqual([])
+    await expect(
+      login(
+        database.db,
+        { loginName: 'owner', password: 'old-password' },
+        formatDatetime(new Date('2026-09-16T03:02:00+09:00')),
+      ),
+    ).resolves.toBeNull()
+    await expect(
+      login(
+        database.db,
+        { loginName: 'owner', password: 'new-password' },
+        formatDatetime(new Date('2026-09-16T03:02:00+09:00')),
+      ),
+    ).resolves.toMatchObject({
+      actor: { id: actor.id },
+    })
+    expect(database.db.select().from(activities).all()).toEqual([])
   })
 })

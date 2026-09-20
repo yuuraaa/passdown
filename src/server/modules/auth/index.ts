@@ -3,6 +3,7 @@ export {
   authenticateSession,
   authenticateToken,
   createAgentActor,
+  createHumanAccount,
   getActorTokenIds,
   hashSecret,
   hashPassword,
@@ -13,13 +14,16 @@ export {
   login,
   logout,
   revokeToken,
+  resetHumanPassword,
   updateAgentPermissions,
 } from './operations.js'
 export {
   actorIdInput,
   createAgentActorInput,
+  createHumanAccountInput,
   listActorsInput,
   loginInput,
+  resetHumanPasswordInput,
   tokenIdInput,
   updateAgentPermissionsInput,
 } from './inputs.js'

@@ -10,9 +10,13 @@ import type { Database } from '../db/connection.js'
 import { recordActivities } from '../modules/activity/index.js'
 import { activities } from '../modules/activity/schema.js'
 import { createProject, updateProject } from '../modules/project/index.js'
-import { sessions } from '../modules/auth/schema.js'
-import { humanCredentials } from '../modules/auth/schema.js'
-import { hashPassword, hashSecret } from '../modules/auth/index.js'
+import { humanCredentials, sessions } from '../modules/auth/schema.js'
+import {
+  createHumanAccount,
+  hashPassword,
+  hashSecret,
+  resetHumanPassword,
+} from '../modules/auth/index.js'
 import { createTask, updateTask } from '../modules/task/index.js'
 import { createTestDatabase } from '../testing/db.js'
 import { ctxFor, FIXED_NOW, insertActor, insertSession, insertToken } from '../testing/fixtures.js'
@@ -78,6 +82,36 @@ describe('認証', () => {
     expect(
       (await app.request('/api/session', { headers: { Cookie: loggedInCookie } })).status,
     ).toBe(401)
+  })
+
+  it('CLI 作成後にログインでき、再設定後は古い Cookie とパスワードを使えない', async () => {
+    await createHumanAccount(database.db, {
+      loginName: 'cli-owner',
+      name: 'CLI owner',
+      password: 'old-password',
+    })
+    const firstLogin = await app.request('/api/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginName: 'cli-owner', password: 'old-password' }),
+    })
+    expect(firstLogin.status).toBe(200)
+    const oldCookie = (firstLogin.headers.get('set-cookie') ?? '').split(';')[0] ?? ''
+
+    await resetHumanPassword(database.db, { loginName: 'cli-owner', password: 'new-password' })
+    expect((await app.request('/api/session', { headers: { Cookie: oldCookie } })).status).toBe(401)
+    const oldPassword = await app.request('/api/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginName: 'cli-owner', password: 'old-password' }),
+    })
+    expect(oldPassword.status).toBe(401)
+    const newPassword = await app.request('/api/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginName: 'cli-owner', password: 'new-password' }),
+    })
+    expect(newPassword.status).toBe(200)
   })
 
   it('ログイン失敗はアカウントの有無を示さない', async () => {

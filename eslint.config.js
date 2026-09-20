@@ -56,6 +56,8 @@ export default tseslint.config(
         { type: 'core', pattern: 'src/server/core', partialMatch: false },
         // テストの土台（インメモリの DB・データの用意・表駆動のテストの入力）
         { type: 'testing', pattern: 'src/server/testing', partialMatch: false },
+        // 運用用の対話 CLI。DB 初期化と各モジュールの公開 API だけを使う
+        { type: 'cli', pattern: 'src/cli', partialMatch: false },
         // Web UI
         { type: 'web', pattern: 'src/web', partialMatch: false },
         // 起動処理・レジストリ（src/server 直下のファイル）。上のどれにも当たらないものだけが当たるよう、最後に置く
@@ -69,7 +71,7 @@ export default tseslint.config(
         { category: 'operations', pattern: 'src/server/modules/*/operations/**/*.ts' },
         { category: 'rules', pattern: 'src/server/modules/*/rules.ts' },
         { category: 'rules', pattern: 'src/server/modules/*/rules/**/*.ts' },
-        { category: 'test', pattern: 'src/server/**/*.test.ts' },
+        { category: 'test', pattern: 'src/**/*.test.ts' },
       ],
     },
     rules: {
@@ -152,6 +154,26 @@ export default tseslint.config(
                 { to: { element: { type: ['core', 'db', 'route', 'app', 'testing'] } } },
                 { to: { element: { type: 'module' }, file: { categories: 'index' } } },
               ],
+            },
+            // CLI は DB 初期化と auth モジュールの公開 API だけに依存する。
+            // schema.ts・operations.ts を含む内部実装は import しない（設計書 4.5）。
+            {
+              from: { element: { type: 'cli' } },
+              allow: [
+                { dependency: { relationship: { to: 'internal' } } },
+                { to: { element: { type: ['core', 'db'] } } },
+                { to: { element: { type: 'module' }, file: { categories: 'index' } } },
+                { to: { element: { type: 'app' } } },
+              ],
+            },
+            {
+              from: { element: { type: 'cli' } },
+              disallow: { to: { element: { type: 'module' }, file: { categories: '*' } } },
+              message: 'CLI からモジュール内部を import せず、index.ts の公開 API を使ってください',
+            },
+            {
+              from: { element: { type: 'cli' } },
+              allow: { to: { element: { type: 'module' }, file: { categories: 'index' } } },
             },
             {
               from: { element: { type: 'testing' } },
@@ -265,6 +287,14 @@ export default tseslint.config(
                 { to: { element: { type: ['db', 'app', 'testing'] } } },
                 { to: { element: { type: 'module' }, file: { categories: 'schema' } } },
                 { to: { module: { source: ['drizzle-orm', 'drizzle-orm/**'] } } },
+              ],
+            },
+            // CLI のテストも、ほかのテストと同様に検証のための内部参照を許可する。
+            {
+              from: { element: { type: 'cli' }, file: { categories: 'test' } },
+              allow: [
+                { to: { element: { type: ['cli', 'db', 'app', 'testing'] } } },
+                { to: { element: { type: 'module' }, file: { categories: 'schema' } } },
               ],
             },
           ],

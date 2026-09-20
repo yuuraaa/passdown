@@ -15,5 +15,11 @@
     "noEmit": true,
     "tsBuildInfoFile": "node_modules/.tmp/tsconfig.server.tsbuildinfo"
   },
-  "include": ["src/server/**/*.ts", "vite.config.ts", "drizzle.config.ts", "eslint.config.js"]
+  "include": [
+    "src/server/**/*.ts",
+    "src/cli/**/*.ts",
+    "vite.config.ts",
+    "drizzle.config.ts",
+    "eslint.config.js"
+  ]
 }
