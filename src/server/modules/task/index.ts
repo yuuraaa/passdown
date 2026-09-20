@@ -11,6 +11,7 @@ export {
   getTaskOperation,
   listActionableTasks,
   listTasks,
+  searchTasks,
   requestTaskReview,
   returnTaskToTodo,
   startTask,
@@ -18,6 +19,9 @@ export {
   type DocumentTaskReference,
   type ProjectTaskSummary,
   type Task,
+  type TaskSearchFilter,
+  type TaskSearchItem,
+  type TaskSearchPage,
 } from './operations.js'
 export {
   addTaskCommentInput,

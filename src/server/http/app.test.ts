@@ -171,6 +171,23 @@ describe('Task', () => {
   })
 })
 
+describe('Search', () => {
+  it('認証済みの GET /api/search でTaskとDocumentを別の配列として返す', async () => {
+    await client().tasks.$post({ json: { title: '検索対象のTask' } })
+    await client().documents.$post({ json: { title: '検索対象のDocument' } })
+
+    const response = await app.request('/api/search?query=%E6%A4%9C%E7%B4%A2%E5%AF%BE%E8%B1%A1', {
+      headers: { Cookie: cookie },
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      tasks: { total: 1, items: [{ title: '検索対象のTask', matchedFields: ['title'] }] },
+      documents: { total: 1, items: [{ title: '検索対象のDocument', matchedFields: ['title'] }] },
+    })
+  })
+})
+
 describe('Project', () => {
   it('作成・詳細・更新・文脈・完了・archive を REST API で利用できる', async () => {
     const created = await app.request('/api/projects', {

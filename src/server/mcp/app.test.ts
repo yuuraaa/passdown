@@ -4,7 +4,7 @@ import { createApp } from '../app.js'
 import { defineOperation } from '../core/operation.js'
 import type { Database } from '../db/connection.js'
 import { activities } from '../modules/activity/schema.js'
-import { createTask, createTaskInput } from '../modules/task/index.js'
+import { addTaskComment, createTask, createTaskInput } from '../modules/task/index.js'
 import { archiveDocument, createDocument } from '../modules/document/index.js'
 import { createTestDatabase } from '../testing/db.js'
 import {
@@ -170,6 +170,7 @@ describe('ツールの登録', () => {
       'list_tasks',
       'request_task_review',
       'return_task_to_todo',
+      'search',
       'start_task',
       'update_document',
       'update_inbox_item',
@@ -189,6 +190,7 @@ describe('ツールの登録', () => {
       'list_inbox_items',
       'list_projects',
       'list_tasks',
+      'search',
       'update_inbox_item',
       'update_project',
     ])
@@ -258,6 +260,56 @@ describe('ツールの呼び出し', () => {
 
     expect(result.isError).toBe(false)
     expect(JSON.parse(result.text)).toMatchObject({ id: 'document:1', tags: ['k8s'] })
+  })
+
+  it('検索結果のTask・Document・コメントのidをMCP形式で返す', async () => {
+    const actor = insertActor(database)
+    const token = insertToken(database, actor)
+    const task = createTask(ctxFor(database, actor), { title: '検索対象' })
+    addTaskComment(ctxFor(database, actor), { id: task.id, body: '検索コメント' })
+    createDocument(ctxFor(database, actor), { title: '検索資料' })
+
+    const result = await callTool(token, 'search', { query: '検索' })
+
+    expect(result.isError).toBe(false)
+    expect(JSON.parse(result.text)).toMatchObject({
+      tasks: {
+        items: [{ id: 'task:1', matchedComments: [{ id: 'comment:1', body: '検索コメント' }] }],
+      },
+      documents: { items: [{ id: 'document:1' }] },
+    })
+  })
+
+  it('片方だけのread権限でも検索ツールを表示し、読めない種類は返さない', async () => {
+    const owner = insertActor(database)
+    const task = createTask(ctxFor(database, owner), { title: '検索Task' })
+    createDocument(ctxFor(database, owner), { title: '検索Document' })
+    addTaskComment(ctxFor(database, owner), { id: task.id, body: 'コメント' })
+    const taskOnly = insertActor(database, { permissions: { document: 'none' } })
+    const documentOnly = insertActor(database, { permissions: { task: 'none' } })
+    const noRead = insertActor(database, { permissions: { task: 'none', document: 'none' } })
+
+    for (const actor of [taskOnly, documentOnly, noRead]) {
+      expect(await listTools(insertToken(database, actor))).toContain('search')
+    }
+    const taskResult: unknown = JSON.parse(
+      (await callTool(insertToken(database, taskOnly), 'search', {})).text,
+    )
+    expect(taskResult).toMatchObject({
+      tasks: { items: [{ id: 'task:1' }] },
+      documents: { items: [] },
+    })
+    const documentResult: unknown = JSON.parse(
+      (await callTool(insertToken(database, documentOnly), 'search', {})).text,
+    )
+    expect(documentResult).toMatchObject({
+      tasks: { items: [] },
+      documents: { items: [{ id: 'document:1' }] },
+    })
+    expect(JSON.parse((await callTool(insertToken(database, noRead), 'search', {})).text)).toEqual({
+      tasks: { items: [], total: 0 },
+      documents: { items: [], total: 0 },
+    })
   })
 
   it('Inbox Item を Task に変換し、ネストした Project ID を MCP 形式で受け取る', async () => {
