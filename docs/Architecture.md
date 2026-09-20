@@ -1293,6 +1293,7 @@ Web UI 専用の経路（1章）。ログインのセッションだけを受け
 | メソッドとパス | 対応する操作 |
 |---|---|
 | `GET /api/actors` | `list_actors` |
+| `GET /api/actors/:id` | agent Actor の詳細（Web UI だけ） |
 | `POST /api/actors` | agent Actor の作成（Web UI だけ） |
 | `PATCH /api/actors/:id/permissions` | 権限の設定（Web UI だけ） |
 | `GET /api/actors/:id/activities` | agent Actor の Activity（要件定義書 F-ACT-02。Web UI だけ） |
@@ -1301,6 +1302,7 @@ Web UI 専用の経路（1章）。ログインのセッションだけを受け
 | `POST /api/tokens/:id/revoke` | トークンの失効（Web UI だけ） |
 
 - 権限の設定を `PATCH /api/actors/:id` にまとめず、`/permissions` に分ける。Actor の項目の更新とは操作も Activity の event_type（`actor.permissions_changed`、5.9）も別のため
+- `GET /api/actors/:id` は agent Actor の `id`・`name`・`actorType`・4リソースの `permissions` を返す。Settings の詳細画面が、現在の権限を確認してから変更するために使う。Token の値・一覧と Activity は含めず、それぞれ専用の既存経路で取得する。human Actor を指定した場合は agent 専用操作として拒否し、MCP には公開しない
 
 #### 検索
 
