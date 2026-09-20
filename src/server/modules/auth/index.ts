@@ -4,6 +4,7 @@ export {
   authenticateToken,
   createAgentActor,
   createHumanAccount,
+  getAgentActor,
   getActorTokenIds,
   hashSecret,
   hashPassword,

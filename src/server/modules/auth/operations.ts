@@ -294,6 +294,27 @@ export const listActors = defineOperation({
       .all(),
 })
 
+/** Settings で既存 agent Actor の現在の権限を確認する（Web UI 専用）。 */
+export const getAgentActor = defineOperation({
+  name: 'get_agent_actor',
+  routes: ['web'],
+  requires: [],
+  returns: [],
+  entity: 'actor',
+  input: actorIdInput,
+  run: (ctx, input) => {
+    const actor = ctx.db.select().from(actors).where(eq(actors.id, input.id)).get()
+    if (!actor) throw new NotFoundError(`actor:${input.id} が見つかりません`)
+    checkAgentActor(actor)
+    return {
+      id: actor.id,
+      name: actor.name,
+      actorType: actor.actorType,
+      permissions: permissionsOf(actor),
+    }
+  },
+})
+
 export const createAgentActor = defineOperation({
   name: 'create_agent_actor',
   routes: ['web'],
