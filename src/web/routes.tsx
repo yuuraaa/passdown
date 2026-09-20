@@ -4,6 +4,7 @@ import { LoginPage, RequireSession } from './auth.js'
 import { Card, PageHeader } from './components/ui.js'
 import { DocumentDetailPage, DocumentsPage, NewDocumentPage } from './documents/documents.js'
 import { InboxDetailPage, InboxPage } from './inbox/inbox.js'
+import { AgentDetailPage, AgentsPage, NewAgentPage } from './settings/settings.js'
 
 const routes = [
   { path: '/login', element: <LoginPage /> },
@@ -29,9 +30,9 @@ const routes = [
       { path: '/documents/:id', element: <DocumentDetailPage /> },
       { path: '/search', element: <Placeholder title="検索" /> },
       { path: '/settings', element: <Navigate replace to="/settings/agents" /> },
-      { path: '/settings/agents', element: <Placeholder title="Agent" /> },
-      { path: '/settings/agents/new', element: <Placeholder title="Agentを作成" /> },
-      { path: '/settings/agents/:id', element: <Placeholder title="Agent" /> },
+      { path: '/settings/agents', element: <AgentsPage /> },
+      { path: '/settings/agents/new', element: <NewAgentPage /> },
+      { path: '/settings/agents/:id', element: <AgentDetailPage /> },
     ],
   },
   { path: '*', element: <Navigate replace to="/tasks" /> },
