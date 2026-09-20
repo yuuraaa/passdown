@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   captureInboxItemInput,
   convertInboxItemInput,
+  getInboxItemInput,
   listInboxItemsInput,
   updateInboxItemInput,
 } from './inputs.js'
@@ -15,6 +16,11 @@ describe('Inbox Item の入力', () => {
     expect(listInboxItemsInput.parse({})).toEqual({ status: 'untriaged', limit: 50, offset: 0 })
     expect(listInboxItemsInput.safeParse({ status: 'unknown' }).success).toBe(false)
     expect(listInboxItemsInput.safeParse({ offset: -1 }).success).toBe(false)
+  })
+
+  it('ID 指定の取得入力を検証する', () => {
+    expect(getInboxItemInput.parse({ id: 1 })).toEqual({ id: 1 })
+    expect(getInboxItemInput.safeParse({ id: 0 }).success).toBe(false)
   })
 
   it('更新には version を必要とする', () => {
