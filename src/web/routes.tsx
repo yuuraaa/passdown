@@ -3,6 +3,7 @@ import { AppShell } from './app-shell.js'
 import { LoginPage, RequireSession } from './auth.js'
 import { Card, PageHeader } from './components/ui.js'
 import { DocumentDetailPage, DocumentsPage, NewDocumentPage } from './documents/documents.js'
+import { InboxDetailPage, InboxPage } from './inbox/inbox.js'
 
 const routes = [
   { path: '/login', element: <LoginPage /> },
@@ -14,7 +15,8 @@ const routes = [
     ),
     children: [
       { index: true, element: <Navigate replace to="/tasks" /> },
-      { path: '/inbox', element: <Placeholder title="Inbox" /> },
+      { path: '/inbox', element: <InboxPage /> },
+      { path: '/inbox/:id', element: <InboxDetailPage /> },
       { path: '/projects', element: <Placeholder title="Projects" /> },
       { path: '/projects/new', element: <Placeholder title="Projectを作成" /> },
       { path: '/projects/:id', element: <Navigate replace to="overview" /> },
