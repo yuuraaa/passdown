@@ -22,6 +22,7 @@ export {
   type TaskSearchFilter,
   type TaskSearchItem,
   type TaskSearchPage,
+  type TaskListItem,
 } from './operations.js'
 export {
   addTaskCommentInput,

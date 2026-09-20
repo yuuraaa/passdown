@@ -19,6 +19,7 @@ import {
   getTaskOperation,
   getUnfinishedProjectTasks,
   hasUnfinishedProjectTasks,
+  listTasks,
   requestTaskReview,
   returnTaskToTodo,
   startTask,
@@ -353,6 +354,52 @@ describe('Task の更新・完了処理', () => {
       .run()
     const stale = updateInput(task)
     expectNothingWritten(() => updateTask(ctx, stale), ConflictError)
+  })
+})
+
+describe('listTasks', () => {
+  it('直接の子 Task の完了状況と、最後に todo へ戻った経緯を各 Task に加える', () => {
+    const completeParent = create({ title: '子が完了した親' })
+    const completedChild = create({ title: '完了した子', parentId: completeParent.id })
+    const cancelledChild = create({ title: 'cancelled の子', parentId: completeParent.id })
+    database.db.update(tasks).set({ status: 'done' }).where(eq(tasks.id, completedChild.id)).run()
+    cancelTask(ctx, { id: cancelledChild.id, result: '中止理由' })
+
+    const incompleteParent = create({ title: '未完了の子を持つ親' })
+    create({ title: '未完了の子', parentId: incompleteParent.id })
+    const noChild = create({ title: '子を持たない Task' })
+
+    const answered = create({ title: '回答済み' })
+    start(answered.id)
+    blockTask(ctx, { id: answered.id, blockedReason: '確認が必要' })
+    returnTaskToTodo(ctx, { id: answered.id, body: '回答です' })
+
+    const returnedForReview = create({ title: '差し戻し済み' })
+    start(returnedForReview.id)
+    requestTaskReview(ctx, { id: returnedForReview.id, result: '成果です' })
+    returnTaskToTodo(ctx, { id: returnedForReview.id, body: '修正してください' })
+
+    const movedOn = create({ title: '再着手済み' })
+    start(movedOn.id)
+    blockTask(ctx, { id: movedOn.id, blockedReason: '確認が必要' })
+    returnTaskToTodo(ctx, { id: movedOn.id, body: '回答です' })
+    start(movedOn.id)
+
+    const byId = new Map(
+      listTasks(ctx, { statuses: ['todo', 'in_progress'] }).items.map((task) => [task.id, task]),
+    )
+    expect(byId.get(completeParent.id)).toMatchObject({
+      allChildrenFinished: true,
+      returnedFrom: null,
+    })
+    expect(byId.get(incompleteParent.id)).toMatchObject({
+      allChildrenFinished: false,
+      returnedFrom: null,
+    })
+    expect(byId.get(noChild.id)).toMatchObject({ allChildrenFinished: false, returnedFrom: null })
+    expect(byId.get(answered.id)).toMatchObject({ returnedFrom: 'blocked' })
+    expect(byId.get(returnedForReview.id)).toMatchObject({ returnedFrom: 'review' })
+    expect(byId.get(movedOn.id)).toMatchObject({ returnedFrom: null })
   })
 })
 
