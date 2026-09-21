@@ -18,6 +18,7 @@ import {
   Textarea,
 } from '../components/ui.js'
 import { ApiError } from '../lib/api.js'
+import { activityLabels } from '../lib/activityLabels.js'
 import {
   type InboxConversion,
   useActors,
@@ -50,13 +51,6 @@ const tags = (value: string) =>
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)
-
-const activityLabel: Record<string, string> = {
-  'inbox_item.captured': '取り込みました',
-  'inbox_item.updated': '本文を更新しました',
-  'inbox_item.converted': '変換しました',
-  'inbox_item.archived': 'アーカイブしました',
-}
 
 function CaptureDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const capture = useCaptureInboxItem()
@@ -439,7 +433,7 @@ export function InboxDetailPage() {
             <li className="grid gap-1 py-3 text-sm" key={activity.id}>
               <span>
                 <ActorDisplay actor={actor(actors.data, activity.actorId)} /> が{' '}
-                {activityLabel[activity.eventType] ?? activity.eventType}{' '}
+                {activityLabels[activity.eventType] ?? activity.eventType}{' '}
                 <StatusBadge status={activity.source}>
                   {activity.source === 'web' ? 'Web' : 'MCP'}
                 </StatusBadge>

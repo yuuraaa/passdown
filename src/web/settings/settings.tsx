@@ -27,6 +27,7 @@ import {
   useUpdatePermissions,
 } from './hooks.js'
 import type { Actor, Agent, Permission, Token } from './types.js'
+import { activityLabels } from '../lib/activityLabels.js'
 
 const resources = [
   ['project', 'Project'],
@@ -39,12 +40,6 @@ const permissionLabels: Record<Permission, string> = {
   none: 'なし',
   read: 'read',
   readwrite: 'readwrite',
-}
-const activityLabels: Record<string, string> = {
-  'actor.created': 'agent Actorを作成しました',
-  'actor.permissions_changed': '権限を変更しました',
-  'token.issued': 'トークンを発行しました',
-  'token.revoked': 'トークンを失効しました',
 }
 
 const message = (error: unknown) => (error instanceof Error ? error.message : '通信に失敗しました')

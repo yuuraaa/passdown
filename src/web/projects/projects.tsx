@@ -19,6 +19,7 @@ import {
   ActorDisplay,
 } from '../components/ui.js'
 import { ApiError } from '../lib/api.js'
+import { activityLabels } from '../lib/activityLabels.js'
 import { useDocuments } from '../documents/hooks.js'
 import {
   useActors,
@@ -553,7 +554,8 @@ function ActivityTab({ id }: { id: number }) {
         {activities.data?.items.map((activity) => (
           <li className="grid gap-1 py-3 text-sm" key={activity.id}>
             <span>
-              <ActorDisplay actor={actor(actors.data, activity.actorId)} /> が {activity.eventType}{' '}
+              <ActorDisplay actor={actor(actors.data, activity.actorId)} /> が{' '}
+              {activityLabels[activity.eventType] ?? activity.eventType}{' '}
               <StatusBadge status={activity.source}>
                 {activity.source === 'web' ? 'Web' : 'MCP'}
               </StatusBadge>

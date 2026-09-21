@@ -21,6 +21,7 @@ import {
   StatusBadge,
   Textarea,
 } from '../components/ui.js'
+import { activityLabels } from '../lib/activityLabels.js'
 import { ApiError } from '../lib/api.js'
 import {
   useActors,
@@ -800,7 +801,8 @@ export function TaskDetailPage() {
               {activities.data?.items.map((entry) => (
                 <li className="grid gap-1 py-3 text-sm" key={entry.id}>
                   <span>
-                    <ActorDisplay actor={actor(actors.data, entry.actorId)!} /> が {entry.eventType}{' '}
+                    <ActorDisplay actor={actor(actors.data, entry.actorId)!} />が{' '}
+                    {activityLabels[entry.eventType] ?? entry.eventType}{' '}
                     <StatusBadge status={entry.source}>
                       {entry.source === 'web' ? 'Web' : 'MCP'}
                     </StatusBadge>
