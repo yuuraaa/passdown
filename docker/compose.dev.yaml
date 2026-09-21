@@ -1,0 +1,47 @@
+# 開発環境コンテナの構築手順
+#
+# 初回起動時
+# 1. `docker compose -f docker/compose.dev.yaml build`
+# 2. `docker compose -f docker/compose.dev.yaml run --rm passdown npm ci`
+# 3. `docker compose -f docker/compose.dev.yaml up`
+#
+# 2回目以降の起動
+#  `docker compose -f docker/compose.dev.yaml up`
+#
+# 依存関係の更新時
+#  `docker compose -f docker/compose.dev.yaml run --rm passdown npm ci`
+#
+# npm ci はコンテナ内で実行する
+
+services:
+  passdown:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: passdown-dev
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /workspace
+    volumes:
+      - ../:/workspace
+      - ../data:/data
+    environment:
+      PASSDOWN_DB_PATH: /data/passdown.sqlite3
+      PASSDOWN_BACKUP_DIR: /data/backups
+      PASSDOWN_HOST: 0.0.0.0
+      PASSDOWN_PORT: "3000"
+      PASSDOWN_MCP_ALLOWED_HOSTS: ${PASSDOWN_MCP_ALLOWED_HOSTS:-localhost}
+    ports:
+      - "${PASSDOWN_DEV_PORT:-3100}:3000"
+    command: npm run dev:server
+
+  web:
+    image: passdown-dev
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /workspace
+    volumes:
+      - ../:/workspace
+    ports:
+      - "${PASSDOWN_WEB_PORT:-5173}:5173"
+    command: npm run dev:web -- --host 0.0.0.0
+    depends_on:
+      - passdown
