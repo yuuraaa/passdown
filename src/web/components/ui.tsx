@@ -39,7 +39,7 @@ function Field({
 }) {
   const id = useId()
   return (
-    <label className="grid gap-1.5 text-sm text-muted" htmlFor={id}>
+    <label className="grid min-w-0 gap-1.5 text-sm text-muted" htmlFor={id}>
       {label}
       {children(id)}
       {error && <span className="text-sm text-danger">{error}</span>}
@@ -57,7 +57,7 @@ export function Input({
       {(id) => (
         <input
           id={id}
-          className="min-h-11 w-full rounded-ui border border-line bg-surface px-3 py-2 text-ink"
+          className="min-h-11 min-w-0 w-full rounded-ui border border-line bg-surface px-3 py-2 text-ink"
           {...props}
         />
       )}
@@ -75,7 +75,7 @@ export function Textarea({
       {(id) => (
         <textarea
           id={id}
-          className="min-h-28 w-full rounded-ui border border-line bg-surface px-3 py-2 text-ink"
+          className="min-h-28 min-w-0 w-full rounded-ui border border-line bg-surface px-3 py-2 text-ink"
           {...props}
         />
       )}
@@ -98,7 +98,7 @@ export function Select({
       {(id) => (
         <select
           id={id}
-          className="min-h-11 w-full rounded-ui border border-line bg-surface px-3 py-2 text-ink"
+          className="min-h-11 min-w-0 w-full rounded-ui border border-line bg-surface px-3 py-2 text-ink"
           {...props}
         >
           {children}

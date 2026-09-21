@@ -89,7 +89,7 @@ export function AppShell() {
           検索
         </button>
       </header>
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 pb-24 md:px-11 md:py-10 md:pb-20">
+      <main className="mx-auto min-w-0 w-full max-w-7xl px-4 py-6 pb-24 md:px-11 md:py-10 md:pb-20">
         <Outlet />
       </main>
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface md:hidden">
