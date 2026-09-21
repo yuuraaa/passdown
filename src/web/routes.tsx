@@ -6,6 +6,7 @@ import { DocumentDetailPage, DocumentsPage, NewDocumentPage } from './documents/
 import { InboxDetailPage, InboxPage } from './inbox/inbox.js'
 import { NewProjectPage, ProjectDetailPage, ProjectsPage } from './projects/projects.js'
 import { AgentDetailPage, AgentsPage, NewAgentPage } from './settings/settings.js'
+import { NewTaskPage, TaskDetailPage, TasksPage } from './tasks/tasks.js'
 
 const routes = [
   { path: '/login', element: <LoginPage /> },
@@ -23,9 +24,9 @@ const routes = [
       { path: '/projects/new', element: <NewProjectPage /> },
       { path: '/projects/:id', element: <Navigate replace to="overview" /> },
       { path: '/projects/:id/:tab', element: <ProjectDetailPage /> },
-      { path: '/tasks', element: <Placeholder title="Tasks" /> },
-      { path: '/tasks/new', element: <Placeholder title="Taskを作成" /> },
-      { path: '/tasks/:id', element: <Placeholder title="Task" /> },
+      { path: '/tasks', element: <TasksPage /> },
+      { path: '/tasks/new', element: <NewTaskPage /> },
+      { path: '/tasks/:id', element: <TaskDetailPage /> },
       { path: '/documents', element: <DocumentsPage /> },
       { path: '/documents/new', element: <NewDocumentPage /> },
       { path: '/documents/:id', element: <DocumentDetailPage /> },

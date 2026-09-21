@@ -122,7 +122,7 @@ export function PageHeader({
   action,
 }: {
   title: string
-  lead?: string
+  lead?: ReactNode
   action?: ReactNode
 }) {
   return (
