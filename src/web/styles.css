@@ -1,14 +1,44 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @theme {
-  --color-canvas: oklch(98% 0.005 250);
-  --color-surface: oklch(100% 0 0);
-  --color-ink: oklch(22% 0.02 240);
-  --color-muted: oklch(50% 0.018 240);
-  --color-line: oklch(90% 0.008 240);
-  --color-accent: oklch(58% 0.16 145);
-  --color-danger: oklch(56% 0.18 27);
+  --color-canvas: var(--theme-canvas);
+  --color-surface: var(--theme-surface);
+  --color-ink: var(--theme-ink);
+  --color-muted: var(--theme-muted);
+  --color-line: var(--theme-line);
+  --color-accent: var(--theme-accent);
+  --color-danger: var(--theme-danger);
+
   --radius-ui: 0.5rem;
+}
+
+/* Light */
+:root,
+[data-theme="light"] {
+  --theme-canvas: #d5d6db;
+  --theme-surface: #e1e2e7;
+  --theme-ink: #343b58;
+  --theme-muted: #6172b0;
+  --theme-line: #a8aecb;
+  --theme-accent: #34548a;
+  --theme-danger: #c64343;
+
+  color-scheme: light;
+}
+
+/* Dark */
+[data-theme="dark"] {
+  --theme-canvas: #1a1b26;
+  --theme-surface: #1f202e;
+  --theme-ink: #c0caf5;
+  --theme-muted: #565f89;
+  --theme-line: #292e42;
+  --theme-accent: #7aa2f7;
+  --theme-danger: #f7768e;
+
+  color-scheme: dark;
 }
 
 @layer base {

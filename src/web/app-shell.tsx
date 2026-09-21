@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router'
 import { useLogout, useSession } from './auth.js'
 import { ActorDisplay, Button } from './components/ui.js'
+import { ThemeSelector } from './components/theme.js'
 
 const navigation = [
   { to: '/inbox', label: 'Inbox', icon: '□' },
@@ -61,7 +62,10 @@ export function AppShell() {
         </button>
         <NavItems />
         <div className="mt-auto grid gap-3 border-t border-line px-2 pt-4 text-xs text-muted">
-          {actor && <ActorDisplay actor={actor} />}
+          <div className="grid grid-cols-[2fr_1fr] gap-2">
+            {actor && <ActorDisplay actor={actor} />}
+            <ThemeSelector />
+          </div>
           <Button
             className="text-xs"
             disabled={logout.isPending}
