@@ -1,15 +1,28 @@
 import { NavLink, Outlet, useNavigate } from 'react-router'
+import {
+  LuInbox,
+  LuFolder,
+  LuListTodo,
+  LuFileText,
+  LuSettings,
+  LuSearch
+} from 'react-icons/lu'
 import { useLogout, useSession } from './auth.js'
 import { ActorDisplay, Button } from './components/ui.js'
 import { ThemeSelector } from './components/theme.js'
 
 const navigation = [
-  { to: '/inbox', label: 'Inbox', icon: '□' },
-  { to: '/projects', label: 'Projects', icon: '▦' },
-  { to: '/tasks', label: 'Tasks', icon: '≡' },
-  { to: '/documents', label: 'Documents', icon: '▤' },
-  { to: '/settings/agents', label: 'Settings', icon: 'S' },
+  { to: '/inbox', label: 'Inbox', icon: LuInbox },
+  { to: '/projects', label: 'Projects', icon: LuFolder },
+  { to: '/tasks', label: 'Tasks', icon: LuListTodo },
+  { to: '/documents', label: 'Documents', icon: LuFileText },
+  { to: '/settings/agents', label: 'Settings', icon: LuSettings },
 ] as const
+
+type NavItemProps = {
+  item: (typeof navigation)[number]
+  mobile?: boolean
+}
 
 function Brand() {
   return (
@@ -20,24 +33,33 @@ function Brand() {
   )
 }
 
+function NavItem({ item, mobile = false}: NavItemProps) {
+  const Icon = item.icon
+
+  return (
+    <NavLink
+      to={item.to}
+      className={({ isActive }) =>
+        mobile
+          ? `grid min-h-15 place-items-center gap-0.5 py-1 text-[10px] ${isActive ? 'font-bold text-ink' : 'text-muted'}`
+          : `flex min-h-11 items-center gap-2 rounded-ui px-3 text-sm ${isActive ? 'bg-ink/7 font-semibold text-ink' : 'text-muted hover:bg-ink/4 hover:text-ink'}`
+      }
+    >
+      <Icon aria-hidden="true" size={20} />
+      <span>{item.label}</span>
+    </NavLink>
+  )
+}
+
 function NavItems({ mobile = false }: { mobile?: boolean }) {
   return (
     <nav className={mobile ? 'grid grid-cols-5' : 'grid gap-1'} aria-label="主なナビゲーション">
       {navigation.map((item) => (
-        <NavLink
+        <NavItem
           key={item.to}
-          to={item.to}
-          className={({ isActive }) =>
-            mobile
-              ? `grid min-h-15 place-items-center gap-0.5 py-1 text-[10px] ${isActive ? 'font-bold text-ink' : 'text-muted'}`
-              : `flex min-h-11 items-center gap-2 rounded-ui px-3 text-sm ${isActive ? 'bg-ink/7 font-semibold text-ink' : 'text-muted hover:bg-ink/4 hover:text-ink'}`
-          }
-        >
-          <span aria-hidden="true" className="font-mono text-base">
-            {item.icon}
-          </span>
-          <span>{item.label}</span>
-        </NavLink>
+          item={item}
+          mobile={mobile}
+        />
       ))}
     </nav>
   )
@@ -58,7 +80,7 @@ export function AppShell() {
             void navigate('/search')
           }}
         >
-          検索 <span className="font-mono text-xs">⌘K</span>
+          <LuSearch size={20} />検索 
         </button>
         <NavItems />
         <div className="mt-auto grid gap-3 border-t border-line px-2 pt-4 text-xs text-muted">

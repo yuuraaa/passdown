@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { LuSun, LuMoon, LuMonitor } from "react-icons/lu";
 
 type Theme = "light" | "dark" | "system";
 
@@ -49,22 +50,53 @@ export function useTheme() {
     setTheme,
   };
 }
+
 export function ThemeSelector() {
   const { theme, setTheme } = useTheme()
 
   return (
-    <div>
-      <select
-        value={theme}
-        onChange={(e) =>
-          setTheme(e.target.value as "light" | "dark" | "system")
-        }
-        className="w-full rounded-ui border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => setTheme("light")}
+        aria-label="ライトモード"
+        title="ライトモード"
+        className={`rounded-ui p-2 ${
+          theme === "light"
+            ? "bg-surface border border-line"
+            : "hover:bg-surface"
+        }`}
       >
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
-        <option value="system">System</option>
-      </select>
+        <LuSun size={20} />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setTheme("dark")}
+        aria-label="ダークモード"
+        title="ダークモード"
+        className={`rounded-ui p-2 ${
+          theme === "dark"
+            ? "bg-surface border border-line"
+            : "hover:bg-surface"
+        }`}
+      >
+        <LuMoon size={20} />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setTheme("system")}
+        aria-label="システム設定"
+        title="システム設定"
+        className={`rounded-ui p-2 ${
+          theme === "system"
+            ? "bg-surface border border-line"
+            : "hover:bg-surface"
+        }`}
+      >
+        <LuMonitor size={20} />
+      </button>
     </div>
-  )
+  );
 }

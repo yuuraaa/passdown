@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from 'react'
+import { LuCircleUserRound, LuBot } from 'react-icons/lu'
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -212,13 +213,15 @@ export function FilterChip({
 }
 
 export function ActorDisplay({ actor }: { actor: { actorType: 'human' | 'agent'; name: string } }) {
+  const Icon = actor.actorType === 'agent' ? LuBot : LuCircleUserRound 
+
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
       <span
         aria-hidden="true"
         className={`grid size-5 place-items-center border border-line text-[10px] text-muted ${actor.actorType === 'agent' ? 'rounded-ui' : 'rounded-full'}`}
       >
-        {actor.actorType === 'agent' ? '□' : '人'}
+        <Icon size={14} />
       </span>
       {actor.name}
     </span>
