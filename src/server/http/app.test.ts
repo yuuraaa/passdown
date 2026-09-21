@@ -216,6 +216,26 @@ describe('認証', () => {
   })
 })
 
+describe('REST API の query 正規化', () => {
+  it('状態が1件のときも配列として扱い、Project ID を数値に変換する', async () => {
+    const ctx = ctxFor(database, owner)
+    const project = createProject(ctx, { name: 'Project' })
+    createTask(ctx, { title: 'Task', projectId: project.id })
+
+    const projects = await app.request('/api/projects?statuses=active', {
+      headers: { Cookie: cookie },
+    })
+    expect(projects.status).toBe(200)
+    expect(((await projects.json()) as { items: unknown[] }).items).toHaveLength(1)
+
+    const tasks = await app.request(`/api/tasks?projectId=${project.id}&statuses=todo`, {
+      headers: { Cookie: cookie },
+    })
+    expect(tasks.status).toBe(200)
+    expect(((await tasks.json()) as { items: unknown[] }).items).toHaveLength(1)
+  })
+})
+
 describe('Task', () => {
   it('作成して着手でき、経路を web として記録する', async () => {
     const created = await client().tasks.$post({ json: { title: 'やること' } })
@@ -245,6 +265,37 @@ describe('Search', () => {
     expect(await response.json()).toMatchObject({
       tasks: { total: 1, items: [{ title: '検索対象のTask', matchedFields: ['title'] }] },
       documents: { total: 1, items: [{ title: '検索対象のDocument', matchedFields: ['title'] }] },
+    })
+  })
+
+  it('Project・Actor の URL クエリを数値として検索入力へ渡す', async () => {
+    const project = createProject(ctxFor(database, owner), { name: '検索用 Project' })
+    createTask(ctxFor(database, owner), { title: '絞り込み対象', projectId: project.id })
+
+    const response = await app.request(
+      `/api/search?query=%E7%B5%9E%E3%82%8A%E8%BE%BC%E3%81%BF&projectId=${project.id}&actorId=${owner.id}`,
+      { headers: { Cookie: cookie } },
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      tasks: { total: 1, items: [{ title: '絞り込み対象' }] },
+    })
+  })
+
+  it('状態が1件の URL クエリを配列として検索入力へ渡す', async () => {
+    await client().tasks.$post({ json: { title: '状態を絞るTask' } })
+    await client().documents.$post({ json: { title: '状態を絞るDocument' } })
+
+    const response = await app.request(
+      '/api/search?query=%E7%8A%B6%E6%85%8B%E3%82%92%E7%B5%9E%E3%82%8B&taskStatuses=todo&documentStatuses=active',
+      { headers: { Cookie: cookie } },
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      tasks: { total: 1, items: [{ title: '状態を絞るTask' }] },
+      documents: { total: 1, items: [{ title: '状態を絞るDocument' }] },
     })
   })
 })

@@ -278,6 +278,11 @@ export default tseslint.config(
               dependency: { kind: 'type' },
               allow: { to: { element: { type: '*' } } },
             },
+            // Web UI の部品どうしは通常の値 import を許可する
+            {
+              from: { element: { type: 'web' } },
+              allow: { to: { element: { type: 'web' } } },
+            },
 
             // テストのファイル（*.test.ts）は、結果を確かめるために DB を直接読み、
             // アプリ全体を組み立ててよい。上の制限より優先するため、最後に置く

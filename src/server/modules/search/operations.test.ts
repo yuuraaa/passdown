@@ -73,6 +73,24 @@ describe('search', () => {
     )
   })
 
+  it('作成日時・更新日時の範囲で絞り込める', async () => {
+    const database = await createTestDatabase()
+    const actor = insertActor(database)
+    const ctx = ctxFor(database, actor)
+    const task = createTask(ctx, { title: '期間内のTask' })
+    const document = createDocument(ctx, { title: '期間内のDocument' })
+
+    const result = search(ctx, {
+      createdFrom: '2026-09-16T00:00:00+09:00',
+      createdTo: '2026-09-17T00:00:00+09:00',
+      updatedFrom: '2026-09-16T00:00:00+09:00',
+      updatedTo: '2026-09-17T00:00:00+09:00',
+    })
+
+    expect(result.tasks.items.map((item) => item.id)).toEqual([task.id])
+    expect(result.documents.items.map((item) => item.id)).toEqual([document.id])
+  })
+
   it('read権限がないリソースを空の結果として返す', async () => {
     const database = await createTestDatabase()
     const owner = insertActor(database)

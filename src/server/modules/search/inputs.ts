@@ -25,12 +25,16 @@ export const searchInput = z.object({
     .optional()
     .describe('担当者または作成者がこの Actor の Task に絞り込む'),
   taskStatuses: z
-    .array(z.enum(taskStatuses))
-    .min(1)
+    .preprocess(
+      (value) => (typeof value === 'string' ? [value] : value),
+      z.array(z.enum(taskStatuses)).min(1),
+    )
     .default([...taskStatuses]),
   documentStatuses: z
-    .array(z.enum(documentStatuses))
-    .min(1)
+    .preprocess(
+      (value) => (typeof value === 'string' ? [value] : value),
+      z.array(z.enum(documentStatuses)).min(1),
+    )
     .default([...documentStatuses]),
   createdFrom: datetime.optional().describe('作成日時の下限（JST のISO 8601）'),
   createdTo: datetime.optional().describe('作成日時の上限（JST のISO 8601）'),
