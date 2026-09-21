@@ -1,11 +1,11 @@
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router'
 import { AppShell } from './app-shell.js'
 import { LoginPage, RequireSession } from './auth.js'
-import { Card, PageHeader } from './components/ui.js'
 import { DocumentDetailPage, DocumentsPage, NewDocumentPage } from './documents/documents.js'
 import { InboxDetailPage, InboxPage } from './inbox/inbox.js'
 import { NewProjectPage, ProjectDetailPage, ProjectsPage } from './projects/projects.js'
 import { AgentDetailPage, AgentsPage, NewAgentPage } from './settings/settings.js'
+import { SearchPage } from './search/search.js'
 import { NewTaskPage, TaskDetailPage, TasksPage } from './tasks/tasks.js'
 
 const routes = [
@@ -30,7 +30,7 @@ const routes = [
       { path: '/documents', element: <DocumentsPage /> },
       { path: '/documents/new', element: <NewDocumentPage /> },
       { path: '/documents/:id', element: <DocumentDetailPage /> },
-      { path: '/search', element: <Placeholder title="検索" /> },
+      { path: '/search', element: <SearchPage /> },
       { path: '/settings', element: <Navigate replace to="/settings/agents" /> },
       { path: '/settings/agents', element: <AgentsPage /> },
       { path: '/settings/agents/new', element: <NewAgentPage /> },
@@ -39,18 +39,6 @@ const routes = [
   },
   { path: '*', element: <Navigate replace to="/tasks" /> },
 ]
-
-function Placeholder({ title }: { title: string }) {
-  return (
-    <>
-      <PageHeader title={title} />
-      <Card className="p-8 text-center">
-        <h2 className="font-semibold">この画面は準備中です</h2>
-        <p className="mt-2 text-muted">共通基盤の次に、この画面の機能を実装します。</p>
-      </Card>
-    </>
-  )
-}
 
 const router = createBrowserRouter(routes)
 export function AppRouter() {
