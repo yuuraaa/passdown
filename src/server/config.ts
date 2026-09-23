@@ -13,16 +13,14 @@ const hostList = z
 const envSchema = z.object({
   PASSDOWN_DB_PATH: z.string().min(1).default('/data/passdown.sqlite3'),
   PASSDOWN_BACKUP_DIR: z.string().min(1).default('/data/backups'),
+  PASSDOWN_BACKUP_INTERVAL_MS: z.coerce.number().int().min(1000).default(24 * 60 * 60 * 1000),
+  PASSDOWN_CHECK_INTERVAL_MS: z.coerce.number().int().min(1000).default(60 * 60 * 1000),
   PASSDOWN_HOST: z.string().min(1).default('0.0.0.0'),
   PASSDOWN_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   // 既定値を持たせると検証が緩いまま気づかず運用できてしまうため、必須にする（設計書 2.9）
   PASSDOWN_MCP_ALLOWED_HOSTS: hostList,
   PASSDOWN_BACKUP_KEEP_DAILY: z.coerce.number().int().min(1).default(14),
   PASSDOWN_BACKUP_KEEP_MIGRATION: z.coerce.number().int().min(1).default(5),
-  PASSDOWN_BACKUP_AT: z
-    .string()
-    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
-    .default('03:00'),
 })
 
 export type Config = z.output<typeof envSchema>
