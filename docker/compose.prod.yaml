@@ -1,0 +1,28 @@
+services:
+  passdown:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.prod
+      args:
+        PASSDOWN_DATA_DIR: ${PASSDOWN_DATA_DIR:-/data}
+    image: passdown
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PASSDOWN_START_MODE: ${PASSDOWN_START_MODE:-server}
+      PASSDOWN_DB_PATH: ${PASSDOWN_DB_PATH:-${PASSDOWN_DATA_DIR:-/data}/passdown.sqlite3}
+      PASSDOWN_BACKUP_DIR: ${PASSDOWN_BACKUP_DIR:-${PASSDOWN_DATA_DIR:-/data}/backups}
+      PASSDOWN_HOST: 0.0.0.0
+      PASSDOWN_PORT: "3000"
+      PASSDOWN_MCP_ALLOWED_HOSTS: ${PASSDOWN_MCP_ALLOWED_HOSTS:?PASSDOWN_MCP_ALLOWED_HOSTS must be set}
+      PASSDOWN_BACKUP_KEEP_DAILY: ${PASSDOWN_BACKUP_KEEP_DAILY:-14}
+      PASSDOWN_BACKUP_KEEP_MIGRATION: ${PASSDOWN_BACKUP_KEEP_MIGRATION:-5}
+      PASSDOWN_BACKUP_INTERVAL_MS: ${PASSDOWN_BACKUP_INTERVAL_MS:-86400000}
+      PASSDOWN_CHECK_INTERVAL_MS: ${PASSDOWN_CHECK_INTERVAL_MS:-3600000}
+    volumes:
+      - passdown_data:${PASSDOWN_DATA_DIR:-/data}
+    ports:
+      - "${PASSDOWN_PORT:-3000}:3000"
+
+volumes:
+  passdown_data:

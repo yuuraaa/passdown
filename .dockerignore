@@ -1,0 +1,9 @@
+.git/
+node_modules/
+dist/
+data/
+.env
+.env.*
+docker/.env
+docker/.env.*
+*.tsbuildinfo

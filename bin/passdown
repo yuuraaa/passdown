@@ -1,2 +1,5 @@
 #!/usr/bin/env sh
+if [ "${NODE_ENV:-}" = production ]; then
+  exec node /workspace/dist/server/cli/main.js "$@"
+fi
 exec npx --no-install tsx /workspace/src/cli/main.ts "$@"
