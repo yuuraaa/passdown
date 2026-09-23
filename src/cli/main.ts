@@ -1,7 +1,8 @@
 import { createInterface } from 'node:readline/promises'
 import { loadConfig } from '../server/config.js'
 import { openDatabase } from '../server/db/connection.js'
-import { runCli, type CliIo } from './commands.js'
+import { runCli } from './commands.js'
+import type { CliIo } from './types.js'
 
 class InterruptedError extends Error {}
 
