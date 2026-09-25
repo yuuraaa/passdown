@@ -50,34 +50,34 @@ function tablesOf(path: string) {
 }
 
 const dbPath = () => join(dir, 'passdown.sqlite3')
-const migrate = (now = options.now) => {
+const migrate = async (now = options.now) => {
   const database = openDatabase(dbPath())
   try {
-    return applyMigrations(database, { ...options, now })
+    return await applyMigrations(database, { ...options, now })
   } finally {
     database.sqlite.close()
   }
 }
 
 describe('applyMigrations', () => {
-  it('マイグレーションがなければ何もしない（v1 までは drizzle-kit push で当てる）', () => {
-    expect(migrate()).toEqual({ status: 'no-migrations' })
+  it('マイグレーションがなければ何もしない（v1 までは drizzle-kit push で当てる）', async () => {
+    expect(await migrate()).toEqual({ status: 'no-migrations' })
   })
 
-  it('初回はコピーを残さずに適用し、2回目は何もしない', () => {
+  it('初回はコピーを残さずに適用し、2回目は何もしない', async () => {
     addMigration('create table t1 (id integer);')
 
-    expect(migrate()).toEqual({ status: 'applied', count: 1, backup: null })
-    expect(migrate()).toEqual({ status: 'up-to-date' })
+    expect(await migrate()).toEqual({ status: 'applied', count: 1, backup: null })
+    expect(await migrate()).toEqual({ status: 'up-to-date' })
     expect(tablesOf(dbPath())).toEqual(['t1'])
   })
 
-  it('未適用のものだけを、適用の前の DB のコピーを残してから適用する', () => {
+  it('未適用のものだけを、適用の前の DB のコピーを残してから適用する', async () => {
     addMigration('create table t1 (id integer);')
-    migrate()
+    await migrate()
     addMigration('create table t2 (id integer);')
 
-    const result = migrate()
+    const result = await migrate()
 
     expect(result).toEqual({
       status: 'applied',
@@ -89,12 +89,35 @@ describe('applyMigrations', () => {
     expect(tablesOf(result.status === 'applied' ? (result.backup ?? '') : '')).toEqual(['t1'])
   })
 
-  it('コピーは決めた世代数だけ残し、古いものから消す', () => {
+  it('WAL に残る変更を含めてコピーしてから適用する', async () => {
     addMigration('create table t1 (id integer);')
-    migrate()
+    await migrate()
+    const writer = openDatabase(dbPath())
+    writer.sqlite.exec('insert into t1 (id) values (1)')
+    addMigration('create table t2 (id integer);')
+
+    try {
+      const result = await migrate()
+      const backup = result.status === 'applied' ? result.backup : null
+      expect(backup).not.toBeNull()
+      const copy = new Sqlite(backup ?? '', { readonly: true })
+      try {
+        expect(copy.prepare('select id from t1').pluck().all()).toEqual([1])
+        expect(tablesOf(backup ?? '')).toEqual(['t1'])
+      } finally {
+        copy.close()
+      }
+    } finally {
+      writer.sqlite.close()
+    }
+  })
+
+  it('コピーは決めた世代数だけ残し、古いものから消す', async () => {
+    addMigration('create table t1 (id integer);')
+    await migrate()
     for (const [i, hour] of [10, 11, 12].entries()) {
       addMigration(`create table t${i + 2} (id integer);`)
-      migrate(new Date(`2026-09-16T${hour}:00:00.000+09:00`))
+      await migrate(new Date(`2026-09-16T${hour}:00:00.000+09:00`))
     }
 
     expect(readdirSync(options.backupDir)).toEqual([
@@ -103,14 +126,14 @@ describe('applyMigrations', () => {
     ])
   })
 
-  it('失敗したら例外を投げ、DB は適用の前のまま', () => {
+  it('失敗したら例外を投げ、DB は適用の前のまま', async () => {
     addMigration('create table t1 (id integer);')
-    migrate()
+    await migrate()
     addMigration(
       'create table t2 (id integer);\n--> statement-breakpoint\ncreate table t1 (id integer);',
     )
 
-    expect(() => migrate()).toThrow()
+    await expect(migrate()).rejects.toThrow()
     expect(tablesOf(dbPath())).toEqual(['t1'])
   })
 })

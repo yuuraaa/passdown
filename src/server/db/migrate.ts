@@ -25,10 +25,10 @@ export type MigrationResult =
  * 未適用のマイグレーションを適用する（設計書 2.6）。適用の前に DB のコピーを残す。
  * 失敗したら例外を投げる。呼び出し側はサーバーを開始せずに異常終了する。
  */
-export function applyMigrations(
+export async function applyMigrations(
   { sqlite, db }: Database,
   options: MigrationOptions,
-): MigrationResult {
+): Promise<MigrationResult> {
   // v1 を出すまでは drizzle-kit push でスキーマを当て、マイグレーションの SQL を持たない（設計書 2.6）
   if (!existsSync(join(options.migrationsFolder, 'meta', '_journal.json'))) {
     return { status: 'no-migrations' }
@@ -41,7 +41,7 @@ export function applyMigrations(
   }
 
   // まだ何も入っていない DB（初回の起動）は、戻す先がないためコピーを残さない
-  const backup = hasTables(sqlite) ? backupBeforeMigration(sqlite, options) : null
+  const backup = hasTables(sqlite) ? await backupBeforeMigration(sqlite, options) : null
   migrate(db, { migrationsFolder: options.migrationsFolder, migrationsTable: MIGRATIONS_TABLE })
   return { status: 'applied', count: pending.length, backup }
 }
@@ -67,13 +67,16 @@ function hasTables(sqlite: Database['sqlite']): boolean {
   )
 }
 
-function backupBeforeMigration(sqlite: Database['sqlite'], options: MigrationOptions): string {
+async function backupBeforeMigration(
+  sqlite: Database['sqlite'],
+  options: MigrationOptions,
+): Promise<string> {
   mkdirSync(options.backupDir, { recursive: true })
   // ファイル名に使えるよう、日時の区切り文字を除く（並び順は保たれる）
   const stamp = formatDatetime(options.now).replace(/[-:]/g, '').replace('+0900', '')
   const path = join(options.backupDir, `${BACKUP_PREFIX}${stamp}.sqlite3`)
   // 動かしたまま一貫した断面を取れ、-wal・-shm を一緒にコピーせずに済む（設計書 2.7）
-  sqlite.prepare('vacuum into ?').run(path)
+  await sqlite.backup(path)
 
   const old = readdirSync(options.backupDir)
     .filter((f) => f.startsWith(BACKUP_PREFIX))
