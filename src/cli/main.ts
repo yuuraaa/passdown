@@ -1,5 +1,5 @@
 import { createInterface } from 'node:readline/promises'
-import { loadConfig } from '../server/config.js'
+import { loadBackupPaths, loadConfig } from '../server/config.js'
 import { openDatabase } from '../server/db/connection.js'
 import { runCli } from './commands.js'
 import type { CliIo } from './types.js'
@@ -40,13 +40,19 @@ function createTerminalIo(): CliIo {
 }
 
 try {
-  const config = loadConfig(process.env)
-  const database = openDatabase(config.PASSDOWN_DB_PATH)
-  process.exitCode = await runCli(process.argv.slice(2), {
-    db: database.db,
-    io: createTerminalIo(),
-  })
-  database.sqlite.close()
+  const args = process.argv.slice(2)
+  const config = args[0] === 'account' ? loadConfig(process.env) : loadBackupPaths(process.env)
+  const database = args[0] === 'account' ? openDatabase(config.PASSDOWN_DB_PATH) : undefined
+  try {
+    process.exitCode = await runCli(args, {
+      db: database?.db,
+      io: createTerminalIo(),
+      db_path: config.PASSDOWN_DB_PATH,
+      backup_path: config.PASSDOWN_BACKUP_DIR,
+    })
+  } finally {
+    database?.sqlite.close()
+  }
 } catch (error) {
   if (!(error instanceof InterruptedError))
     console.error(error instanceof Error ? error.message : error)

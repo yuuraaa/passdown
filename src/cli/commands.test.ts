@@ -27,6 +27,7 @@ class FakeIo implements CliIo {
 }
 
 let database: Database
+const backupPaths = { db_path: '/tmp/passdown-unused.sqlite3', backup_path: '/tmp/passdown-unused-backups' }
 
 beforeEach(async () => {
   database = await createTestDatabase()
@@ -36,7 +37,7 @@ describe('CLI', () => {
   it('account コマンドを accout CLI に振り分ける', async () => {
     const io = new FakeIo(['owner', '', 'secret-password', 'secret-password'])
 
-    await expect(runCli(['account', 'create'], { db: database.db, io })).resolves.toBe(0)
+    await expect(runCli(['account', 'create'], { db: database.db, io, ...backupPaths })).resolves.toBe(0)
 
     expect(database.db.select().from(humanCredentials).get()).toMatchObject({ loginName: 'owner' })
   })
@@ -44,7 +45,7 @@ describe('CLI', () => {
   it('不正なトップレベルコマンドでは usage を表示して失敗する', async () => {
     const io = new FakeIo([])
 
-    await expect(runCli(['unknown'], { db: database.db, io })).resolves.toBe(1)
+    await expect(runCli(['unknown'], { db: database.db, io, ...backupPaths })).resolves.toBe(1)
     
     expect(io.output.join('')).toContain('使い方: passdown')
   })

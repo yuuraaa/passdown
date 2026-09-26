@@ -25,6 +25,11 @@ const envSchema = z.object({
 
 export type Config = z.output<typeof envSchema>
 
+/** バックアップ CLI はサーバーを起動しないため、DB と保存先の設定だけを読む。 */
+export function loadBackupPaths(env: NodeJS.ProcessEnv) {
+  return envSchema.pick({ PASSDOWN_DB_PATH: true, PASSDOWN_BACKUP_DIR: true }).parse(env)
+}
+
 /** 環境変数を起動時に1か所で読んで検証する。足りなければ例外を投げる（設計書 2.9） */
 export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const result = envSchema.safeParse(env)
