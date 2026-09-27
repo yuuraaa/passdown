@@ -6,7 +6,7 @@ import type { CliIo } from './types.js'
 
 class InterruptedError extends Error {}
 
-function createTerminalIo(): CliIo {
+function createTerminalIo(): CliIo & { close(): void } {
   const readline = createInterface({ input: process.stdin, output: process.stdout })
   return {
     isTTY: process.stdin.isTTY === true && process.stdout.isTTY === true,
@@ -36,6 +36,7 @@ function createTerminalIo(): CliIo {
         stdin.on('data', onData)
       }),
     write: (message) => process.stdout.write(message),
+    close: () => readline.close(),
   }
 }
 
@@ -43,14 +44,16 @@ try {
   const args = process.argv.slice(2)
   const config = args[0] === 'account' ? loadConfig(process.env) : loadBackupPaths(process.env)
   const database = args[0] === 'account' ? openDatabase(config.PASSDOWN_DB_PATH) : undefined
+  const io = createTerminalIo()
   try {
     process.exitCode = await runCli(args, {
       db: database?.db,
-      io: createTerminalIo(),
+      io,
       db_path: config.PASSDOWN_DB_PATH,
       backup_path: config.PASSDOWN_BACKUP_DIR,
     })
   } finally {
+    io.close()
     database?.sqlite.close()
   }
 } catch (error) {
