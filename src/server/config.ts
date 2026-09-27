@@ -10,22 +10,46 @@ const hostList = z
   )
   .pipe(z.array(z.string()).min(1))
 
+const startModeSchema = z.enum(['server', 'restore_wait']).default('server')
+
 const envSchema = z.object({
   PASSDOWN_DB_PATH: z.string().min(1).default('/data/passdown.sqlite3'),
   PASSDOWN_BACKUP_DIR: z.string().min(1).default('/data/backups'),
+  PASSDOWN_BACKUP_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .default(24 * 60 * 60 * 1000),
+  PASSDOWN_CHECK_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .default(60 * 60 * 1000),
   PASSDOWN_HOST: z.string().min(1).default('0.0.0.0'),
   PASSDOWN_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   // 既定値を持たせると検証が緩いまま気づかず運用できてしまうため、必須にする（設計書 2.9）
   PASSDOWN_MCP_ALLOWED_HOSTS: hostList,
   PASSDOWN_BACKUP_KEEP_DAILY: z.coerce.number().int().min(1).default(14),
   PASSDOWN_BACKUP_KEEP_MIGRATION: z.coerce.number().int().min(1).default(5),
-  PASSDOWN_BACKUP_AT: z
-    .string()
-    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
-    .default('03:00'),
 })
 
+export type StartMode = z.output<typeof startModeSchema>
+
+/** DB や通常サーバーの設定を読む前に起動モードを検証する。 */
+export function loadStartMode(env: NodeJS.ProcessEnv): StartMode {
+  const result = startModeSchema.safeParse(env.PASSDOWN_START_MODE)
+  if (!result.success) {
+    throw new Error(`PASSDOWN_START_MODE が不正です:\n${z.prettifyError(result.error)}`)
+  }
+  return result.data
+}
+
 export type Config = z.output<typeof envSchema>
+
+/** バックアップ CLI はサーバーを起動しないため、DB と保存先の設定だけを読む。 */
+export function loadBackupPaths(env: NodeJS.ProcessEnv) {
+  return envSchema.pick({ PASSDOWN_DB_PATH: true, PASSDOWN_BACKUP_DIR: true }).parse(env)
+}
 
 /** 環境変数を起動時に1か所で読んで検証する。足りなければ例外を投げる（設計書 2.9） */
 export function loadConfig(env: NodeJS.ProcessEnv): Config {
