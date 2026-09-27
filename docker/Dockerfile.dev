@@ -6,4 +6,4 @@ RUN apt-get update \
 
 WORKDIR /workspace
 
-ENV PATH="/workspace/bin:${PATH}"
+ENV PATH="/workspace/node_modules/.bin:/workspace/bin:${PATH}"

@@ -1,0 +1,39 @@
+FROM node:24-bookworm-slim AS builder
+
+WORKDIR /workspace
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+RUN npm run build:web \
+    && npm run build:server \
+    && mkdir -p drizzle
+
+
+FROM node:24-bookworm-slim AS runtime
+
+WORKDIR /workspace
+ARG PASSDOWN_DATA_DIR=/data
+
+ENV NODE_ENV=production
+ENV PATH="/workspace/bin:${PATH}"
+
+COPY package.json package-lock.json ./
+
+RUN npm ci --omit=dev \
+    && npm cache clean --force
+
+COPY --from=builder --chown=node:node /workspace/dist ./dist
+COPY --from=builder --chown=node:node /workspace/drizzle ./drizzle
+COPY --from=builder --chown=node:node /workspace/bin ./bin
+
+RUN mkdir -p "${PASSDOWN_DATA_DIR}/backups" \
+    && chown -R node:node "${PASSDOWN_DATA_DIR}"
+
+USER node
+
+EXPOSE 3000
+
+CMD ["npm", "start"]

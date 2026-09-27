@@ -19,12 +19,14 @@ passdown は、人間と AI エージェントが Task を通じて協働する�
 開発作業はコンテナの中で行う。
 
 ```bash
-docker compose up -d
-docker compose exec passdown bash
+docker compose -f docker/compose.dev.yaml build
+docker compose -f docker/compose.dev.yaml run --rm --no-deps passdown npm ci
+docker compose -f docker/compose.dev.yaml up -d
+docker compose -f docker/compose.dev.yaml exec passdown bash
 ```
 
-- `compose.yaml` と `Dockerfile.dev` は開発用。本番用のイメージは別に作る
-- ホストの `./data` をコンテナの `/data` にバインドマウントし、DB とバックアップを置く（設計書 2.9）。`data/` は git の対象外
+- `docker/compose.dev.yaml` と `docker/Dockerfile.dev` は開発用。本番用は `docker/compose.prod.yaml` と `docker/Dockerfile.prod`
+- 開発環境ではホストの `./data` をコンテナの `/data` にバインドマウントし、DB とバックアップを置く（設計書 2.9）。本番 Compose は named volume を使う。`data/` は git の対象外
 - ホスト側の公開ポートは既定で 3100（`PASSDOWN_DEV_PORT` で変えられる）。コンテナの中では 3000 で待ち受ける
 - 使う道具は設計書 2.8（npm・Drizzle 0.45 系・ESLint ＋ eslint-plugin-boundaries・Biome の formatter）
 

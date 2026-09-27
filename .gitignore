@@ -6,3 +6,6 @@ data/
 
 # TypeScript のビルド情報
 *.tsbuildinfo
+
+# Compose のローカル設定
+docker/.env

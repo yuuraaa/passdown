@@ -14,7 +14,15 @@ export default defineConfig({
   server: {
     // コンテナの中では 3000 で待ち受ける（2.9）
     host: true,
-    port: 3000,
+    port: 5173,
+    watch: {
+      usePolling: true,
+    },
+    proxy: {
+      "/api": {
+        target: "http://passdown:3000",
+      }
+    }
   },
   test: {
     root: import.meta.dirname,

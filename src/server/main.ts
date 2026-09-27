@@ -7,7 +7,7 @@ import { openDatabase } from './db/connection.js'
 import { applyMigrations } from './db/migrate.js'
 import { backupMiddleware } from './db/backup.js'
 
-const root = resolve(import.meta.dirname, '../..')
+const root = process.cwd()
 
 // 起動モードを DB 初期化前に選ぶ。復元待機中は CLI の実行を待つだけにする。
 try {
