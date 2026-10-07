@@ -77,6 +77,7 @@ flowchart LR
 - ツールの説明は MCP の層（`mcp/descriptions.ts`）に、操作の名前ごとに書く。`routes` に `'mcp'` を含む操作に説明がなければ、登録のときにエラーにする
 - `create_document`・`update_document` の説明文には、ツールを登録するときに document モジュールの関数で既存のタグの一覧を読んで入れる（要件定義書 F-DOC-02）。エージェントが既存のタグを見てから付けられるようにするため
 - SDK はトークンを検証しないため、SDK の手前に置いた自前のミドルウェアで Bearer トークンを検証し、Actor を `authInfo`（`extra.actor`）として SDK に渡す。トークンが無い・無効なら、SDK に渡さずに 401 を返す
+- 認証は MCP のリクエストごとに行う。Actor の削除前に認証が成功したリクエストは、業務操作の開始前にその Actor が削除されても実行を許す。業務操作の開始時に Actor の active を再確認する処理は追加しない。削除後に届いた次のリクエストは認証で拒否する。例えば、タスク更新のリクエストの認証後に Actor が削除された場合、その更新は許可するが、その後のタスク読み取りのリクエストは拒否する。認証の許可を次のリクエストに引き継がない
 - プロトコルは 2026-07-28 版と 2025 年版の両方を受ける（SDK の既定）
   - 2025 年版のクライアントがサーバーからの通知用のストリーム（GET）を開こうとすると 405 を返すが、passdown には通知を送る要件がないため問題にしない
 - `createMcpHonoApp` の `allowedHosts`・`allowedOrigins` を必ず設定する。既定の `127.0.0.1` バインドなら Host・Origin を localhost 系で検証するが、コンテナでは `0.0.0.0` にバインドするためこの既定が外れる（2.9）
@@ -686,7 +687,7 @@ export const approveTask = defineOperation({
 
 #### 人間だけの操作は経路で制限する
 
-- 承認（review → done）、Task の cancel、Project の done・archive、agent Actor の作成・権限の設定、トークンの発行・失効、Activity の閲覧は、`routes: ['web']` にする
+- 承認（review → done）、Task の cancel、Project の done・archive、agent Actor の作成・名前変更・論理削除・権限の設定、トークンの発行・失効、Activity の閲覧は、`routes: ['web']` にする
 - MCP への登録は、`routes` に `'mcp'` を含む操作しか受け付けない（型で落とす）。ツールを足しただけでは人間だけの操作は MCP に出ない
 - REST API は Cookie のセッションだけを見て、`Authorization` ヘッダを読まない。MCP はトークンだけを見て、Cookie を読まない。セッションとトークンはテーブルが分かれている（5.3）ため、これでエージェントのトークンは REST API に使えない（要件定義書 F-AUTH-04）
 - 業務ロジックの層では `actor_type` を見て分岐しない。人間だけの操作であることは `routes` の宣言にだけ表れる（要件定義書 設計原則4）
@@ -810,7 +811,8 @@ export const approveTask = defineOperation({
 actors
   id             INTEGER PK AUTOINCREMENT
   actor_type     TEXT NOT NULL  CHECK (human / agent)
-  name           TEXT NOT NULL  UNIQUE
+  name           TEXT NOT NULL
+  status         TEXT NOT NULL DEFAULT 'active' CHECK (active / archived)
   perm_project   TEXT NOT NULL  CHECK (none / read / readwrite)
   perm_task      TEXT NOT NULL  CHECK (none / read / readwrite)
   perm_document  TEXT NOT NULL  CHECK (none / read / readwrite)
@@ -825,7 +827,8 @@ human_credentials
 - human と agent を1つのテーブル `actors` で持つ。Actor を参照する列（作成者・担当・Activity の actor 等）は、すべて `actors.id` の1列で参照する（要件定義書 6.1「すべての記録で同じ形式で参照できる」）
 - ログインの情報（ログイン名・パスワードのハッシュ）は `human_credentials` に分ける。Drizzle の `select()` は既定ですべての列を読むため、`actors` に置くと、担当の一覧などで読んだ Actor にハッシュが混ざり、応答に出るおそれがあるため
 - ログインは、ログイン名とパスワードで行う。ログイン名は表示名（`actors.name`）と分け、表示名を変えてもログイン名が変わらないようにする
-- `name` は重複させない。担当を名前で選び、エージェントも `list_actors` の結果を名前で見分けるため
+- `name` は active の Actor 間で重複させない。担当を名前で選び、エージェントも `list_actors` の結果を名前で見分けるため。archived の名前は、新しい agent Actor の作成や active の agent Actor の名前変更で再利用できる。human は常に active のため、human の名前との重複も引き続き禁止する
+- DB では `CREATE UNIQUE INDEX actors_active_name_unique ON actors(name) WHERE status = 'active'` の部分一意インデックスで保証する。マイグレーションで従来の `actors.name` の全行対象の UNIQUE 制約を外し、このインデックスに置き換える。既存の Actor の id と他テーブルからの参照は維持する
 - human の行の数は制限しない。人間ユーザーはオーナー1人だけ（要件定義書 2.1）だが、human が複数いると動かない作りにしないため。コードでも「human は1人」を前提にしない（例: human の Actor を1件だけ読んで使う）
 - CLI でのアカウントの作成は、human がすでにいても拒まない（human の人数を確かめない）。「オーナー1人」は使い方の前提で、システムの制約にはしない。アカウントの作成・パスワードの再設定は、ログイン名を指定して行う
 - アカウントの作成・再設定は、`passdown account create` と `passdown account reset-password` で行う。Compose では `docker compose exec -it passdown passdown …`、k0s では `kubectl exec -it deployment/passdown -- passdown …` と実行する。前置きは実行環境の違いであり、CLI の契約には含めない
@@ -836,6 +839,16 @@ human_credentials
 - human の行にも、4つとも readwrite を入れる。権限の確認で Actor の種類によって分岐しないため（要件定義書 設計原則4）。承認と Actor・トークンの操作は、権限ではなく経路で制限する（1章）ため、そのための列は持たない
 - created_at は持たない。agent Actor を作った日時は Activity に残るため
 - version は持たない。楽観ロックの対象（要件定義書 10章）ではないため
+
+- agent の名前は Settings の詳細画面で変更できる。Actor の id・権限・トークン・既存の参照は変えない。`actor.renamed` に変更前後の名前を記録し、画面での Actor 表示は現在の名前を使う。human の名前変更と MCP からの名前変更は公開しない
+- agent の削除は `status = archived` にする論理削除とし、UI の操作名は「削除」にする。復元は持たない。human は常に active とし、削除対象にはできない。既存の Actor はマイグレーションで active にする。削除後は同じ名前の新しい agent Actor を別の id で作成でき、古い Actor のトークン・権限・担当を引き継がない
+- archived の Actor・Token・Activity と、Task の作成者・コメント作成者・完了済み Task の担当等の参照は削除しない。削除日時は `actor.archived` の Activity に残し、専用の日時列は持たない
+- archived の名前変更・権限変更・トークン発行・再削除を拒否する。トークン認証では Token が未失効でも Actor が archived なら拒否する。担当割当の検証では存在確認に加えて active を確認し、履歴の存在確認では archived を許す
+- 削除の起点操作 `archive_agent_actor` は auth が持つ。Task の未完了担当件数の取得と未割当への変更は task の公開関数を呼び、auth から task のテーブルを直接操作しない。未完了の対象判定は task の判定関数が持つ
+- 削除入力の `unassignTasks` は既定 false とする。担当する未完了 Task があって false なら変更せず拒否する。true なら該当 Task の `assignee_id` を NULL にし、`updated_at` を更新して `version` を上げる。Task の状態・本文・親子関係は変えず、done / cancelled の担当は維持する
+- 削除・未完了 Task の担当解除・有効な全 Token の失効・各 Activity の記録は同一トランザクションで行う。失効済み Token の日時は変更しない。確認画面の表示後に担当 Task が増減しても、削除時に読み直して判定する。新規割当と削除はトランザクション内で active の確認を行い、削除後に担当が残る競合を防ぐ
+- `list_actors` は Web・MCP ともに active の担当候補だけを返す。履歴表示用には Web 専用の `list_actor_directory` を用意し、削除済みを含む id・name・actorType・status を返す。Web の履歴・作成者・担当表示はこの一覧を使い、担当を選ぶ候補は active に絞る。検索の Actor フィルタでは archived も選べる
+- MCP の取得結果では、Task・コメント等の Actor の id による参照を維持し、その結果から参照されている Actor の補足情報（id・name・actorType・status）を添える。archived も解決し、名前は現在の名前を使う。同名の active の Actor で代用しない。補足するのは、権限による絞り込み後の取得結果から参照されている Actor だけとし、権限・トークンの情報は含めない。担当候補の `list_actors` と Web 専用の `list_actor_directory` の公開範囲は変えず、MCP に履歴用の Actor 一覧ツールは追加しない
 
 ### 5.3 Token・ログインのセッション
 
@@ -1074,6 +1087,8 @@ activities
 | 対象 | event_type | 起こる操作 |
 |---|---|---|
 | actor | `actor.created` | agent Actor の作成 |
+| | `actor.renamed` | agent Actor の名前変更 |
+| | `actor.archived` | agent Actor の論理削除 |
 | | `actor.permissions_changed` | 権限の設定 |
 | token | `token.issued` | トークンの発行 |
 | | `token.revoked` | トークンの失効 |
@@ -1097,6 +1112,7 @@ activities
 | | `task.commented` | コメントの投稿 |
 | | `task.auto_started` | 子 Task が in_progress になったときの、親の自動の in_progress |
 | | `task.auto_cancelled` | 親 Task の cancel・Project の archive に伴う、子孫・Project の Task の cancel |
+| | `task.auto_assignee_changed` | agent Actor の論理削除に伴う、未完了 Task の担当解除 |
 | | `task.auto_moved` | 最上位の Task の Project を変えたときの、子孫の追随 |
 | document | `document.created` | Document の作成 |
 | | `document.updated` | 項目・タグの更新 |
@@ -1155,7 +1171,7 @@ activities
 | `activities` | `(entity_type, entity_id)` | エンティティの画面、「回答済み」「差し戻し済み」の判定 |
 | `activities` | `project_id` | Project の画面の Activity |
 
-- UNIQUE 制約（`actors.name`・`human_credentials.login_name`・`tokens.token_hash`・`sessions.session_hash`）には、インデックスが自動で張られる。トークン・セッションの照合はこれを使う
+- UNIQUE 制約（`human_credentials.login_name`・`tokens.token_hash`・`sessions.session_hash`）には、インデックスが自動で張られる。トークン・セッションの照合はこれを使う。`actors.name` は active の行だけを対象とする部分一意インデックスを明示的に張る（5.2）
 - SQLite はインデックスに rowid（id）を含めて持つため、`activities` を対象で絞った後の id の順の並べ替えも、インデックスの中で済む
 - キーワード検索（`LIKE '%語%'`）はインデックスを使えないため、検索のためのインデックスは張らない（3.4）
 
@@ -1298,17 +1314,20 @@ Web UI 専用の経路（1章）。ログインのセッションだけを受け
 
 | メソッドとパス | 対応する操作 |
 |---|---|
-| `GET /api/actors` | `list_actors` |
+| `GET /api/actors` | `list_actors`。`includeArchived=true` の場合は Web 専用の `list_actor_directory` を呼び、履歴表示用の削除済みを含む一覧を返す |
 | `GET /api/actors/:id` | agent Actor の詳細（Web UI だけ） |
 | `POST /api/actors` | agent Actor の作成（Web UI だけ） |
+| `PATCH /api/actors/:id` | agent Actor の名前変更（Web UI だけ）。入力は `name` |
 | `PATCH /api/actors/:id/permissions` | 権限の設定（Web UI だけ） |
+| `POST /api/actors/:id/archive` | `archive_agent_actor`（Web UI だけ）。入力は `unassignTasks: boolean`（既定 false） |
 | `GET /api/actors/:id/activities` | agent Actor の Activity（要件定義書 F-ACT-02。Web UI だけ） |
 | `GET /api/actors/:id/tokens` | トークンの一覧（Web UI だけ） |
 | `POST /api/actors/:id/tokens` | トークンの発行（Web UI だけ） |
 | `POST /api/tokens/:id/revoke` | トークンの失効（Web UI だけ） |
 
 - 権限の設定を `PATCH /api/actors/:id` にまとめず、`/permissions` に分ける。Actor の項目の更新とは操作も Activity の event_type（`actor.permissions_changed`、5.9）も別のため
-- `GET /api/actors/:id` は agent Actor の `id`・`name`・`actorType`・4リソースの `permissions` を返す。Settings の詳細画面が、現在の権限を確認してから変更するために使う。Token の値・一覧と Activity は含めず、それぞれ専用の既存経路で取得する。human Actor を指定した場合は agent 専用操作として拒否し、MCP には公開しない
+- `GET /api/actors/:id` は agent Actor の `id`・`name`・`actorType`・`status`・4リソースの `permissions` と `unfinishedTaskCount` を返す。Settings の詳細画面が現在の状態と権限、削除時の担当解除件数を確認するために使う。Token の値・一覧と Activity は含めず、それぞれ専用の既存経路で取得する。archived も読み取れる。human Actor を指定した場合は agent 専用操作として拒否し、MCP には公開しない
+- `POST /api/actors/:id/archive` は、確認に同意していない未完了 Task があれば `not_allowed`（409）で拒否する。確認後に Task が割り当てられたため拒否された場合は、UI が件数を再取得し、未割当への変更に同意するか再確認する
 
 #### 検索
 
@@ -1383,9 +1402,9 @@ Web UI は、リソースの一覧・詳細・作成に URL を持たせる。�
 | `/documents/new` | Document の作成 |
 | `/documents/:id` | Document の本文・タグ・参照元・Activityと操作 |
 | `/search` | Task・Document の検索 |
-| `/settings/agents` | agent Actor の一覧 |
+| `/settings/agents` | agent Actor の一覧。既定は active、削除済みを含める切り替えを持つ |
 | `/settings/agents/new` | agent Actor の作成と最初の権限設定 |
-| `/settings/agents/:id` | agent Actor の権限・トークン・Activity |
+| `/settings/agents/:id` | agent Actor の名前変更・削除・権限・トークン・Activity。archived は状態を表示して読み取り専用 |
 
 - `/` は `/tasks`、`/projects/:id` は `/projects/:id/overview`、`/settings` は `/settings/agents` へ移す
 - Project 詳細だけは、共通の Project 見出しと操作を残して Overview / Tasks / Documents / Activity を子ルートで切り替える。どのタブを開いているかを URL で復元するため
@@ -1470,6 +1489,10 @@ Task 詳細には、コメントの入力欄を初めから表示し、同じ入
 - 成功したら Task 本体・コメント・Activity・Task 一覧の TanStack Query のキャッシュを無効化して再取得する
 
 ### 8.4 Actor の表示
+
+- archived の Actor も名前と種別アイコンで表示し、「削除済み」を添える。同名の Actor を再作成しても、参照は Actor の id で解決し、古い履歴を新しい Actor の表示に置き換えない。削除済みの一覧に同名が複数ある場合は Actor の id も添えて区別する。Actor の参照を名前不明や human の表示に置き換えない
+- Settings の削除確認ダイアログには、全トークンの失効・履歴の保持・取り消し不可を表示する。担当する未完了 Task がある場合は件数と「未完了タスクを未割当に変更する」のチェック項目（既定は未選択）を表示し、選択するまで削除ボタンを無効にする。キャンセルでは何も変更しない。削除成功後は通常のエージェント一覧へ戻る
+- 名前変更・削除の検証はコンテナ内で行う。業務テストでは履歴と完了済み Task の参照保持、全トークンの失効、同意の有無、担当解除の Activity・版数更新、削除後の変更・再割当拒否、トランザクションのロールバックを確認する。HTTP・MCP では経路制限と担当候補からの除外を確認する。開発コンテナを起動し Chrome Devtools MCP で名前変更・削除確認・削除済みの閲覧を PC とスマホ幅で確認する
 
 作成者・更新者・担当者・コメント・Activity は、人物／ロボットの種別アイコンと Actor 名を組み合わせた共通の表示部品を使う。
 
