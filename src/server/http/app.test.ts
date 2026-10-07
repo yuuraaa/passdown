@@ -153,6 +153,8 @@ describe('認証', () => {
       id: agent.id,
       name: 'Codex',
       actorType: 'agent',
+      status: 'active',
+      unfinishedTaskCount: 0,
       permissions: { project: 'read', task: 'readwrite', document: 'none', inbox: 'read' },
     })
 
@@ -638,4 +640,58 @@ describe('エラーの応答（設計書 7.6）', () => {
     expect(body.type).toBe('internal')
     expect(body.message).not.toContain('秘密')
   })
+})
+
+it('名前変更・削除のHTTP経路はhuman専用で、同意と履歴一覧を扱える', async () => {
+  const agent = insertActor(database)
+  const task = createTask(ctxFor(database, owner), { title: '同意確認', assigneeId: agent.id })
+  const headers = { Cookie: cookie, 'Content-Type': 'application/json' }
+  const path = `/api/actors/${agent.id}`
+  expect(
+    (
+      await app.request(path, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ name: '変更名' }),
+      })
+    ).status,
+  ).toBe(200)
+  expect(
+    (await app.request(`${path}/archive`, { method: 'POST', headers, body: '{}' })).status,
+  ).toBe(409)
+  expect(
+    (
+      await app.request(`${path}/archive`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ unassignTasks: true }),
+      })
+    ).status,
+  ).toBe(200)
+  expect(await (await app.request(`/api/tasks/${task.id}`, { headers })).json()).toMatchObject({
+    assigneeId: null,
+  })
+  expect(await (await app.request('/api/actors', { headers })).json()).not.toContainEqual(
+    expect.objectContaining({ id: agent.id }),
+  )
+  expect(
+    await (await app.request('/api/actors?includeArchived=true', { headers })).json(),
+  ).toContainEqual({ id: agent.id, name: '変更名', actorType: 'agent', status: 'archived' })
+  expect(
+    (await app.request(`${path}/archive`, { method: 'POST', headers, body: '{}' })).status,
+  ).toBe(409)
+  for (const [method, endpoint] of [
+    ['PATCH', path],
+    ['POST', `${path}/archive`],
+  ]) {
+    const response = await app.request(endpoint!, {
+      method,
+      headers: {
+        Authorization: `Bearer ${insertToken(database, agent)}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    })
+    expect(response.status).toBe(401)
+  }
 })

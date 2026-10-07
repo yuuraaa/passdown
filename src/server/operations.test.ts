@@ -46,6 +46,7 @@ it('一覧に操作が集まっている', () => {
   expect(operations.map((op) => op.name).sort()).toEqual([
     'add_task_comment',
     'approve_task',
+    'archive_agent_actor',
     'archive_document',
     'archive_inbox_item',
     'archive_project',
@@ -72,6 +73,7 @@ it('一覧に操作が集まっている', () => {
     'get_task_activities',
     'issue_token',
     'list_actionable_tasks',
+    'list_actor_directory',
     'list_actor_tokens',
     'list_actors',
     'list_document_tags',
@@ -79,6 +81,7 @@ it('一覧に操作が集まっている', () => {
     'list_inbox_items',
     'list_projects',
     'list_tasks',
+    'rename_agent_actor',
     'request_task_review',
     'return_task_to_todo',
     'revoke_token',

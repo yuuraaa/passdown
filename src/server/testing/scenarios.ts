@@ -95,6 +95,11 @@ export const scenarios: Record<string, Scenario> = {
   get_agent_actor: {
     arrange: ({ database }) => ({ id: insertActor(database).id }),
   },
+  rename_agent_actor: { arrange: (h) => ({ id: insertActor(h.database).id, name: '変更後' }) },
+  archive_agent_actor: {
+    arrange: (h) => ({ id: insertActor(h.database).id, unassignTasks: true }),
+  },
+  list_actor_directory: { arrange: () => ({}) },
   create_agent_actor: {
     arrange: () => ({
       name: '実装エージェント',
