@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { readFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Sqlite from 'better-sqlite3'
@@ -136,4 +136,69 @@ describe('applyMigrations', () => {
     await expect(migrate()).rejects.toThrow()
     expect(tablesOf(dbPath())).toEqual(['t1'])
   })
+})
+
+it('既存Actorと全参照を維持して移行し、削除済みの名前を再利用できる', async () => {
+  const database = openDatabase(dbPath())
+  database.sqlite.exec(readFileSync('drizzle/0000_wild_golden_guardian.sql', 'utf8'))
+  database.sqlite.exec(
+    "INSERT INTO actors(id, actor_type, name, perm_project, perm_task, perm_document, perm_inbox) VALUES(7, 'agent', '既存Actor', 'read', 'read', 'read', 'read')",
+  )
+  database.sqlite.exec(
+    "INSERT INTO tokens(actor_id, token_hash, issued_at) VALUES(7, 'hash', '2026-09-16T12:00:00+09:00')",
+  )
+  database.sqlite.exec(
+    "CREATE TABLE __drizzle_migrations(id INTEGER PRIMARY KEY, hash TEXT NOT NULL, created_at NUMERIC); INSERT INTO __drizzle_migrations VALUES(1, 'old', 1790400796912)",
+  )
+  database.sqlite.exec(
+    "INSERT INTO tasks(id, title, status, assignee_id, created_by, created_at, updated_at) VALUES(3, '既存Task', 'done', 7, 7, '2026-09-16T12:00:00+09:00', '2026-09-16T12:00:00+09:00')",
+  )
+  database.sqlite.exec(
+    "INSERT INTO task_comments(task_id, body, created_by, created_at) VALUES(3, '既存コメント', 7, '2026-09-16T12:00:00+09:00')",
+  )
+  database.sqlite.exec(
+    "INSERT INTO activities(event_type, entity_type, entity_id, actor_id, source, occurred_at) VALUES('actor.created', 'actor', 7, 7, 'web', '2026-09-16T12:00:00+09:00')",
+  )
+  await applyMigrations(database, { ...options, migrationsFolder: 'drizzle' })
+  expect(database.sqlite.prepare('SELECT assignee_id, created_by FROM tasks').get()).toEqual({
+    assignee_id: 7,
+    created_by: 7,
+  })
+  expect(database.sqlite.prepare('SELECT created_by FROM task_comments').get()).toEqual({
+    created_by: 7,
+  })
+  expect(database.sqlite.prepare('SELECT actor_id FROM activities').get()).toEqual({ actor_id: 7 })
+  expect(database.sqlite.prepare('SELECT id, status FROM actors').get()).toEqual({
+    id: 7,
+    status: 'active',
+  })
+  expect(database.sqlite.prepare('SELECT actor_id FROM tokens').get()).toEqual({ actor_id: 7 })
+  expect(database.sqlite.pragma('foreign_key_check')).toEqual([])
+  expect(database.sqlite.pragma('foreign_keys', { simple: true })).toBe(1)
+  database.sqlite.exec("UPDATE actors SET status = 'archived' WHERE id = 7")
+  database.sqlite.exec(
+    "INSERT INTO actors(actor_type, name, perm_project, perm_task, perm_document, perm_inbox) VALUES('agent', '既存Actor', 'none', 'none', 'none', 'none')",
+  )
+  expect(() =>
+    database.sqlite.exec(
+      "INSERT INTO actors(actor_type, name, perm_project, perm_task, perm_document, perm_inbox) VALUES('agent', '既存Actor', 'none', 'none', 'none', 'none')",
+    ),
+  ).toThrow()
+  database.sqlite.close()
+})
+
+it('移行後の外部キー不整合ではSQLと適用履歴をロールバックし検査を戻す', async () => {
+  addMigration('CREATE TABLE t1 (id INTEGER PRIMARY KEY);')
+  await migrate()
+  addMigration('CREATE TABLE t2 (actor_id INTEGER REFERENCES t1(id)); INSERT INTO t2 VALUES(999);')
+  const database = openDatabase(dbPath())
+  await expect(applyMigrations(database, options)).rejects.toThrow('外部キーの不整合')
+  expect(
+    database.sqlite.prepare('SELECT count(*) as total FROM __drizzle_migrations').get(),
+  ).toEqual({ total: 1 })
+  expect(
+    database.sqlite.prepare("SELECT name FROM sqlite_master WHERE name = 't2'").get(),
+  ).toBeUndefined()
+  expect(database.sqlite.pragma('foreign_keys', { simple: true })).toBe(1)
+  database.sqlite.close()
 })

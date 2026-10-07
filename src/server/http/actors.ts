@@ -1,6 +1,12 @@
 import { Hono } from 'hono'
 import {
   createAgentActor,
+  renameAgentActor,
+  renameAgentActorInput,
+  archiveAgentActor,
+  archiveAgentActorInput,
+  listActorDirectory,
+  actorDirectoryQuery,
   createAgentActorInput,
   getAgentActor,
   issueToken,
@@ -16,13 +22,37 @@ import { idParam, zValidator } from './validator.js'
 
 export function actorRoutes(deps: RouteDeps) {
   const list = expose(listActors)
+  const directory = expose(listActorDirectory)
+  const rename = expose(renameAgentActor)
+  const archive = expose(archiveAgentActor)
   const get = expose(getAgentActor)
   const create = expose(createAgentActor)
   const updatePermissions = expose(updateAgentPermissions)
   const listTokens = expose(listActorTokens)
   const issue = expose(issueToken)
   return new Hono<ApiEnv>()
-    .get('/', (c) => c.json(list(webCtx(deps, c), {}), 200))
+    .get('/', zValidator('query', actorDirectoryQuery), (c) =>
+      c.json(
+        c.req.valid('query').includeArchived === 'true'
+          ? directory(webCtx(deps, c), {})
+          : list(webCtx(deps, c), {}),
+        200,
+      ),
+    )
+    .patch(
+      '/:id',
+      zValidator('param', idParam),
+      zValidator('json', renameAgentActorInput.omit({ id: true })),
+      (c) =>
+        c.json(rename(webCtx(deps, c), { ...c.req.valid('param'), ...c.req.valid('json') }), 200),
+    )
+    .post(
+      '/:id/archive',
+      zValidator('param', idParam),
+      zValidator('json', archiveAgentActorInput.omit({ id: true })),
+      (c) =>
+        c.json(archive(webCtx(deps, c), { ...c.req.valid('param'), ...c.req.valid('json') }), 200),
+    )
     .get('/:id', zValidator('param', idParam), (c) =>
       c.json(get(webCtx(deps, c), c.req.valid('param')), 200),
     )

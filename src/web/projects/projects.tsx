@@ -41,8 +41,8 @@ const labels: Record<ProjectStatus, string> = {
   done: '完了',
   archived: 'アーカイブ済み',
 }
-const actor = (actors: Actor[] | undefined, id: number): Actor =>
-  actors?.find((item) => item.id === id) ?? { id, actorType: 'human', name: `Actor #${id}` }
+const actor = (actors: Actor[] | undefined, id: number): Actor | undefined =>
+  actors?.find((item) => item.id === id)
 const date = (value: string) =>
   new Intl.DateTimeFormat('ja-JP', {
     dateStyle: 'medium',

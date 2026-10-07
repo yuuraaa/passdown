@@ -44,3 +44,12 @@ export const resetHumanPasswordInput = z.object({
   loginName: z.string().trim().min(1, '空にできません').max(100),
   password: z.string().min(1, '空にできません').max(1024),
 })
+
+export const renameAgentActorInput = z.object({ id: entityId('actor'), name: actorName })
+export const archiveAgentActorInput = z.object({
+  id: entityId('actor'),
+  unassignTasks: z.boolean().default(false),
+})
+export const actorDirectoryQuery = z.object({
+  includeArchived: z.enum(['true', 'false']).optional(),
+})

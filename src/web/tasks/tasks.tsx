@@ -56,9 +56,7 @@ const statusLabels: Record<TaskStatus, string> = {
 }
 const priorityLabels: Record<TaskPriority, string> = { high: '高', normal: '通常', low: '低' }
 const actor = (actors: Actor[] | undefined, id: number | null): Actor | null =>
-  id === null
-    ? null
-    : (actors?.find((item) => item.id === id) ?? { id, actorType: 'human', name: `Actor #${id}` })
+  id === null ? null : (actors?.find((item) => item.id === id) ?? null)
 const date = (value: string) =>
   new Intl.DateTimeFormat('ja-JP', {
     dateStyle: 'medium',
@@ -115,7 +113,7 @@ function TaskRow({
         </div>
         <div className="text-sm md:text-right">
           {actor(actors, item.assigneeId) ? (
-            <ActorDisplay actor={actor(actors, item.assigneeId)!} />
+            <ActorDisplay actor={actor(actors, item.assigneeId)} />
           ) : (
             <span className="text-muted">未割り当て</span>
           )}
@@ -194,11 +192,13 @@ export function TasksPage() {
           }
         >
           <option value="">すべての担当者</option>
-          {actors.data?.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
+          {actors.data
+            ?.filter((item) => item.status === 'active')
+            .map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
         </Select>
       </div>
       {tasks.isPending && <p className="text-muted">読み込み中…</p>}
@@ -417,11 +417,13 @@ function TaskForm({
         onChange={(event) => setAssigneeId(event.target.value ? Number(event.target.value) : null)}
       >
         <option value="">未割り当て</option>
-        {actors.data?.map((item) => (
-          <option key={item.id} value={item.id}>
-            {item.name}
-          </option>
-        ))}
+        {actors.data
+          ?.filter((item) => item.status === 'active')
+          .map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
       </Select>
       <LinksEditor disabled={pending} onChange={setLinks} value={links} />
       {initial && (
@@ -731,7 +733,7 @@ export function TaskDetailPage() {
                   key={entry.id}
                 >
                   <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <ActorDisplay actor={actor(actors.data, entry.createdBy)!} />
+                    <ActorDisplay actor={actor(actors.data, entry.createdBy)} />
                     <time className="text-muted">{date(entry.createdAt)}</time>
                   </div>
                   <p className="whitespace-pre-wrap">{entry.body}</p>
@@ -801,7 +803,7 @@ export function TaskDetailPage() {
               {activities.data?.items.map((entry) => (
                 <li className="grid gap-1 py-3 text-sm" key={entry.id}>
                   <span>
-                    <ActorDisplay actor={actor(actors.data, entry.actorId)!} />が{' '}
+                    <ActorDisplay actor={actor(actors.data, entry.actorId)} />が{' '}
                     {activityLabels[entry.eventType] ?? entry.eventType}{' '}
                     <StatusBadge status={entry.source}>
                       {entry.source === 'web' ? 'Web' : 'MCP'}
@@ -832,7 +834,7 @@ export function TaskDetailPage() {
               <dt className="text-muted">担当者</dt>
               <dd>
                 {actor(actors.data, item.assigneeId) ? (
-                  <ActorDisplay actor={actor(actors.data, item.assigneeId)!} />
+                  <ActorDisplay actor={actor(actors.data, item.assigneeId)} />
                 ) : (
                   '未割り当て'
                 )}
@@ -841,7 +843,7 @@ export function TaskDetailPage() {
             <div>
               <dt className="text-muted">作成者</dt>
               <dd>
-                <ActorDisplay actor={actor(actors.data, item.createdBy)!} />
+                <ActorDisplay actor={actor(actors.data, item.createdBy)} />
               </dd>
             </div>
             <div>

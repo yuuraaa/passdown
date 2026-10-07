@@ -39,8 +39,8 @@ const statuses: readonly { value: InboxItemStatus; label: string }[] = [
 ]
 
 const message = (error: unknown) => (error instanceof Error ? error.message : '通信に失敗しました')
-const actor = (actors: Actor[] | undefined, id: number): Actor =>
-  actors?.find((item) => item.id === id) ?? { id, actorType: 'human', name: `Actor #${id}` }
+const actor = (actors: Actor[] | undefined, id: number): Actor | undefined =>
+  actors?.find((item) => item.id === id)
 const lines = (value: string) =>
   value
     .split('\n')

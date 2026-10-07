@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { readMigrationFiles } from 'drizzle-orm/migrator'
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { formatDatetime } from '../core/time.js'
 import type { Database } from './connection.js'
 
@@ -26,7 +25,7 @@ export type MigrationResult =
  * 失敗したら例外を投げる。呼び出し側はサーバーを開始せずに異常終了する。
  */
 export async function applyMigrations(
-  { sqlite, db }: Database,
+  { sqlite }: Database,
   options: MigrationOptions,
 ): Promise<MigrationResult> {
   // v1 を出すまでは drizzle-kit push でスキーマを当て、マイグレーションの SQL を持たない（設計書 2.6）
@@ -42,7 +41,25 @@ export async function applyMigrations(
 
   // まだ何も入っていない DB（初回の起動）は、戻す先がないためコピーを残さない
   const backup = hasTables(sqlite) ? await backupBeforeMigration(sqlite, options) : null
-  migrate(db, { migrationsFolder: options.migrationsFolder, migrationsTable: MIGRATIONS_TABLE })
+  // Actor のテーブル再構築中も、参照先IDを維持する。検査はコミット前に行う。
+  sqlite.pragma('foreign_keys = OFF')
+  try {
+    sqlite.exec(
+      `CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (id INTEGER PRIMARY KEY AUTOINCREMENT, hash TEXT NOT NULL, created_at NUMERIC)`,
+    )
+    sqlite.transaction(() => {
+      for (const migration of pending) {
+        for (const statement of migration.sql) sqlite.exec(statement)
+        sqlite
+          .prepare(`INSERT INTO ${MIGRATIONS_TABLE} (hash, created_at) VALUES (?, ?)`)
+          .run(migration.hash, migration.folderMillis)
+      }
+      if ((sqlite.pragma('foreign_key_check') as unknown[]).length > 0)
+        throw new Error('マイグレーションで外部キーの不整合が発生しました')
+    })()
+  } finally {
+    sqlite.pragma('foreign_keys = ON')
+  }
   return { status: 'applied', count: pending.length, backup }
 }
 

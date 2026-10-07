@@ -1,10 +1,11 @@
+import { archiveAgentActor, renameAgentActor } from '../modules/auth/index.js'
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '../app.js'
 import { defineOperation } from '../core/operation.js'
 import type { Database } from '../db/connection.js'
 import { activities } from '../modules/activity/schema.js'
-import { addTaskComment, createTask, createTaskInput } from '../modules/task/index.js'
+import { addTaskComment, createTask, createTaskInput, updateTask } from '../modules/task/index.js'
 import { archiveDocument, createDocument } from '../modules/document/index.js'
 import { createTestDatabase } from '../testing/db.js'
 import {
@@ -413,4 +414,64 @@ describe('ツールの呼び出し', () => {
       text: expect.stringContaining('着手できるのは todo の Task だけです') as string,
     })
   })
+})
+
+it('削除済みActorを履歴補足に含め、候補と管理ツールから除外する', async () => {
+  const owner = insertActor(database, { actorType: 'human' })
+  const historical = insertActor(database, { name: '以前のActor' })
+  const reader = insertActor(database)
+  const commenter = insertActor(database, { name: 'コメントのActor' })
+  const token = insertToken(database, reader)
+  const oldToken = insertToken(database, historical)
+  const task = createTask(ctxFor(database, historical), { title: '過去の履歴' })
+  addTaskComment(ctxFor(database, historical), { id: task.id, body: '以前のコメント' })
+  addTaskComment(ctxFor(database, commenter), { id: task.id, body: '別の作成者' })
+  archiveAgentActor(ctxFor(database, owner), { id: commenter.id })
+  renameAgentActor(ctxFor(database, owner), { id: historical.id, name: '履歴名' })
+  archiveAgentActor(ctxFor(database, owner), { id: historical.id })
+  const result = JSON.parse(
+    (await callTool(token, 'get_task', { id: `task:${task.id}` })).text,
+  ) as { actors: unknown[]; createdBy: string }
+  expect(result.createdBy).toBe(`actor:${historical.id}`)
+  expect(result.actors).toContainEqual({
+    id: `actor:${commenter.id}`,
+    name: commenter.name,
+    actorType: 'agent',
+    status: 'archived',
+  })
+  expect(result.actors).toContainEqual({
+    id: `actor:${historical.id}`,
+    name: '履歴名',
+    actorType: 'agent',
+    status: 'archived',
+  })
+  expect(JSON.stringify(result.actors)).not.toContain('permissions')
+  const candidates = JSON.parse((await callTool(token, 'list_actors', {})).text) as { id: string }[]
+  expect(candidates.some((a) => a.id === `actor:${historical.id}`)).toBe(false)
+  const toolNames = await listTools(token)
+  for (const name of ['rename_agent_actor', 'archive_agent_actor', 'list_actor_directory'])
+    expect(toolNames).not.toContain(name)
+  expect(
+    (
+      await post(
+        { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+        { Authorization: `Bearer ${oldToken}` },
+      )
+    ).status,
+  ).toBe(401)
+})
+
+it('閲覧権限で除外したDocumentのActor情報を補足しない', async () => {
+  const owner = insertActor(database, { actorType: 'human' })
+  const hidden = insertActor(database)
+  const reader = insertActor(database, { permissions: { document: 'none' } })
+  const document = createDocument(ctxFor(database, hidden), { title: '非公開資料' })
+  const task = createTask(ctxFor(database, owner), { title: '公開タスク' })
+  updateTask(ctxFor(database, owner), { ...task, id: task.id, documentIds: [document.id] })
+  const token = insertToken(database, reader)
+  const result = JSON.parse(
+    (await callTool(token, 'get_task', { id: `task:${task.id}` })).text,
+  ) as { actors: { id: string }[]; documents: unknown[] }
+  expect(result.documents).toEqual([])
+  expect(result.actors.map((a) => a.id)).toEqual([`actor:${owner.id}`])
 })

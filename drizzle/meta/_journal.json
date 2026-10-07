@@ -8,6 +8,20 @@
       "when": 1790400796912,
       "tag": "0000_wild_golden_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791369600000,
+      "tag": "0001_actor_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791369600001,
+      "tag": "0002_actor_activities",
+      "breakpoints": true
     }
   ]
 }

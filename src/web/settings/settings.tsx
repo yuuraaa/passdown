@@ -18,6 +18,8 @@ import {
   useActivities,
   useAgent,
   useActors,
+  useRenameAgent,
+  useArchiveAgent,
   useCreateAgent,
   useIssueToken,
   useLatestActivities,
@@ -82,11 +84,12 @@ function Permissions({
 
 function PermissionText({ permissions }: { permissions: Agent['permissions'] }) {
   return (
-    <div className='flex flex-wrap'>
-      {resources
-        .map(([key, label], index) => (
-          <span key={key}>{`${label.replace('（コメントを含む）', '')}: ${permissions[key]} ${resources.length - 1 === index ? "" : " / "}`}</span>
-        ))}
+    <div className="flex flex-wrap">
+      {resources.map(([key, label], index) => (
+        <span
+          key={key}
+        >{`${label.replace('（コメントを含む）', '')}: ${permissions[key]} ${resources.length - 1 === index ? '' : ' / '}`}</span>
+      ))}
     </div>
   )
 }
@@ -103,11 +106,7 @@ function ActivityList({
   return (
     <ActivityTimeline>
       {activities.items.map((item) => {
-        const actor = actors?.find((candidate) => candidate.id === item.actorId) ?? {
-          id: item.actorId,
-          actorType: 'human' as const,
-          name: `Actor #${item.actorId}`,
-        }
+        const actor = actors?.find((candidate) => candidate.id === item.actorId)
         return (
           <li className="grid gap-1 py-4" key={item.id}>
             <p className="text-sm">
@@ -125,7 +124,8 @@ function ActivityList({
 }
 
 export function AgentsPage() {
-  const actors = useActors()
+  const [includeArchived, setIncludeArchived] = useState(false)
+  const actors = useActors(includeArchived)
   const agents = (actors.data ?? []).filter((actor) => actor.actorType === 'agent')
   const latest = useLatestActivities(agents)
   const tokens = useTokensForAgents(agents)
@@ -140,6 +140,14 @@ export function AgentsPage() {
         lead="agent Actorの権限とトークンを、オーナーが管理します。"
         title="Settings / Agents"
       />
+      <label className="mb-4 flex min-h-11 items-center gap-2">
+        <input
+          type="checkbox"
+          checked={includeArchived}
+          onChange={(event) => setIncludeArchived(event.target.checked)}
+        />
+        削除済みを含める
+      </label>
       {actors.isPending && <p className="text-muted">読み込み中…</p>}
       {actors.isError && <p className="text-danger">{message(actors.error)}</p>}
       {actors.data &&
@@ -251,8 +259,15 @@ export function NewAgentPage() {
 }
 
 export function AgentDetailPage() {
+  const navigate = useNavigate()
   const id = Number(useParams().id)
-  const actorList = useActors()
+  const actorList = useActors(true)
+  const rename = useRenameAgent(id)
+  const archive = useArchiveAgent(id)
+  const [nameOpen, setNameOpen] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [unassignTasks, setUnassignTasks] = useState(false)
   const agent = useAgent(id)
   const tokens = useTokens(id)
   const activities = useActivities(id)
@@ -269,6 +284,7 @@ export function AgentDetailPage() {
   if (agent.isPending) return <p className="text-muted">読み込み中…</p>
   if (agent.isError || !agent.data) return <p className="text-danger">{message(agent.error)}</p>
   const item = agent.data
+  const archived = item.status === 'archived'
   const savePermissions = () => {
     if (!draft) return
     const parsed = updateAgentPermissionsInput.safeParse({ id, permissions: draft })
@@ -281,19 +297,45 @@ export function AgentDetailPage() {
     <>
       <PageHeader
         action={
-          <Button
-            disabled={issue.isPending}
-            onClick={() =>
-              issue.mutate(undefined, { onSuccess: (token) => setIssuedToken(token.token) })
-            }
-            variant="primary"
-          >
-            {issue.isPending ? '発行中…' : 'トークンを発行'}
-          </Button>
+          !archived && (
+            <Button
+              disabled={issue.isPending}
+              onClick={() =>
+                issue.mutate(undefined, { onSuccess: (token) => setIssuedToken(token.token) })
+              }
+              variant="primary"
+            >
+              {issue.isPending ? '発行中…' : 'トークンを発行'}
+            </Button>
+          )
         }
         lead="agent Actorの権限・トークン・Activityを確認します。"
-        title={item.name}
+        title={`${item.name}${archived ? '（削除済み）' : ''}`}
       />
+      {!archived && (
+        <div className="mb-5 flex gap-3">
+          <Button
+            onClick={() => {
+              setNameDraft(item.name)
+              setNameOpen(true)
+              rename.reset()
+            }}
+          >
+            名前を変更
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              setUnassignTasks(false)
+              archive.reset()
+              void agent.refetch()
+              setArchiveOpen(true)
+            }}
+          >
+            削除
+          </Button>
+        </div>
+      )}
       {issue.isError && <p className="mb-4 text-sm text-danger">{message(issue.error)}</p>}
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
         <div className="grid gap-5">
@@ -301,6 +343,7 @@ export function AgentDetailPage() {
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="font-semibold">権限</h2>
               <Button
+                disabled={archived}
                 onClick={() => {
                   setDraft(item.permissions)
                   setError(null)
@@ -341,6 +384,7 @@ export function AgentDetailPage() {
                         <span className="text-sm text-muted">失効済み</span>
                       ) : (
                         <Button
+                          disabled={archived}
                           className="justify-self-start"
                           onClick={() => setRevokeTarget(token)}
                           variant="danger"
@@ -372,13 +416,96 @@ export function AgentDetailPage() {
               <div>
                 <dt className="text-sm text-muted">補足</dt>
                 <dd className="mt-1 text-sm">
-                  agentの無効化は持たず、使わなくなったトークンを失効します。
+                  {archived
+                    ? '削除済みのため読み取り専用です。履歴は保持されています。'
+                    : '使わなくなったエージェントは削除できます。'}
                 </dd>
               </div>
             </dl>
           </Card>
         </aside>
       </div>
+      <Dialog
+        open={nameOpen}
+        onClose={() => {
+          if (!rename.isPending) setNameOpen(false)
+        }}
+        title="エージェント名を変更"
+      >
+        <div className="grid gap-4">
+          <Input
+            label="Actor名"
+            value={nameDraft}
+            disabled={rename.isPending}
+            onChange={(event) => setNameDraft(event.target.value)}
+          />
+          {rename.isError && (
+            <p role="alert" className="text-danger">
+              {message(rename.error)}
+            </p>
+          )}
+          <Button
+            variant="primary"
+            disabled={!nameDraft.trim() || rename.isPending}
+            onClick={() => rename.mutate(nameDraft, { onSuccess: () => setNameOpen(false) })}
+          >
+            変更を保存
+          </Button>
+        </div>
+      </Dialog>
+      <Dialog
+        open={archiveOpen}
+        onClose={() => {
+          if (!archive.isPending) setArchiveOpen(false)
+        }}
+        title="エージェントを削除"
+      >
+        <div className="grid gap-4">
+          <p>
+            すべての有効なトークンが失効します。過去のタスク・コメント・Activityの履歴は残ります。削除は取り消せません。
+          </p>
+          {item.unfinishedTaskCount > 0 && (
+            <label className="flex min-h-11 items-center gap-2">
+              <input
+                type="checkbox"
+                checked={unassignTasks}
+                disabled={archive.isPending}
+                onChange={(event) => setUnassignTasks(event.target.checked)}
+              />
+              未完了タスク {item.unfinishedTaskCount} 件を未割当に変更する
+            </label>
+          )}
+          {archive.isError && (
+            <p role="alert" className="text-danger">
+              {message(archive.error)}
+            </p>
+          )}
+          <div className="flex gap-3">
+            <Button disabled={archive.isPending} onClick={() => setArchiveOpen(false)}>
+              キャンセル
+            </Button>
+            <Button
+              variant="danger"
+              disabled={
+                archive.isPending ||
+                agent.isFetching ||
+                (item.unfinishedTaskCount > 0 && !unassignTasks)
+              }
+              onClick={() =>
+                archive.mutate(unassignTasks, {
+                  onSuccess: () => void navigate('/settings/agents'),
+                  onError: () => {
+                    setUnassignTasks(false)
+                    void agent.refetch()
+                  },
+                })
+              }
+            >
+              {archive.isPending ? '削除中…' : '削除する'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
       <Dialog onClose={() => setPermissionOpen(false)} open={permissionOpen} title="権限を変更">
         <div className="grid gap-5">
           {draft && (

@@ -1,11 +1,14 @@
 import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
-import { and, asc, eq, isNull, lte } from 'drizzle-orm'
+import { and, asc, eq, isNull, lte, inArray } from 'drizzle-orm'
 import { NotAllowedError, NotFoundError } from '../../core/errors.js'
 import { type Actor, type Ctx, defineOperation, type Db } from '../../core/operation.js'
 import { formatDatetime } from '../../core/time.js'
+import { getUnfinishedAssignedTasks, unassignUnfinishedActorTasks } from '../task/index.js'
 import { recordActivities } from '../activity/index.js'
 import {
   actorIdInput,
+  renameAgentActorInput,
+  archiveAgentActorInput,
   createAgentActorInput,
   createHumanAccountInput,
   listActorsInput,
@@ -190,6 +193,7 @@ export function authenticateToken(db: Db, token: string): Actor | null {
           eq(tokens.tokenHash, hashSecret(token)),
           isNull(tokens.revokedAt),
           eq(actors.actorType, 'agent'),
+          eq(actors.status, 'active'),
         ),
       )
       .get()
@@ -288,8 +292,14 @@ export const listActors = defineOperation({
   input: listActorsInput,
   run: (ctx) =>
     ctx.db
-      .select({ id: actors.id, name: actors.name, actorType: actors.actorType })
+      .select({
+        id: actors.id,
+        name: actors.name,
+        actorType: actors.actorType,
+        status: actors.status,
+      })
       .from(actors)
+      .where(eq(actors.status, 'active'))
       .orderBy(asc(actors.id))
       .all(),
 })
@@ -310,6 +320,8 @@ export const getAgentActor = defineOperation({
       id: actor.id,
       name: actor.name,
       actorType: actor.actorType,
+      status: actor.status,
+      unfinishedTaskCount: getUnfinishedAssignedTasks(ctx, actor.id).length,
       permissions: permissionsOf(actor),
     }
   },
@@ -323,6 +335,14 @@ export const createAgentActor = defineOperation({
   entity: 'actor',
   input: createAgentActorInput,
   run: (ctx, input) => {
+    if (
+      ctx.db
+        .select({ id: actors.id })
+        .from(actors)
+        .where(and(eq(actors.name, input.name), eq(actors.status, 'active')))
+        .get()
+    )
+      throw new NotAllowedError('その名前は利用中のActorが使用しています')
     const actor = ctx.db
       .insert(actors)
       .values({
@@ -359,6 +379,7 @@ export const updateAgentPermissions = defineOperation({
   run: (ctx, input) => {
     const actor = ctx.db.select().from(actors).where(eq(actors.id, input.id)).get()
     if (!actor) throw new NotFoundError(`actor:${input.id} が見つかりません`)
+    editableAgent(ctx, actor.id)
     checkCanChangeAgentPermissions(actor)
     const updated = ctx.db
       .update(actors)
@@ -420,6 +441,7 @@ export const issueToken = defineOperation({
   run: (ctx, input) => {
     const actor = ctx.db.select().from(actors).where(eq(actors.id, input.id)).get()
     if (!actor) throw new NotFoundError(`actor:${input.id} が見つかりません`)
+    editableAgent(ctx, actor.id)
     checkCanIssueToken(actor)
     const token = randomBytes(32).toString('base64url')
     const issued = ctx.db
@@ -478,3 +500,124 @@ export const revokeToken = defineOperation({
     return revoked
   },
 })
+
+function editableAgent(ctx: Ctx, id: number): AuthActor {
+  const actor = ctx.db.select().from(actors).where(eq(actors.id, id)).get()
+  if (!actor) throw new NotFoundError(`actor:${id} が見つかりません`)
+  checkAgentActor(actor)
+  if (actor.status !== 'active') throw new NotAllowedError('削除済みのエージェントは変更できません')
+  return actor
+}
+export const renameAgentActor = defineOperation({
+  name: 'rename_agent_actor',
+  routes: ['web'],
+  requires: [],
+  returns: [],
+  entity: 'actor',
+  input: renameAgentActorInput,
+  run: (ctx, input) => {
+    const actor = editableAgent(ctx, input.id)
+    const duplicate = ctx.db
+      .select()
+      .from(actors)
+      .where(and(eq(actors.name, input.name), eq(actors.status, 'active')))
+      .get()
+    if (duplicate && duplicate.id !== actor.id)
+      throw new NotAllowedError('その名前は利用中のActorが使用しています')
+    const updated = ctx.db
+      .update(actors)
+      .set({ name: input.name })
+      .where(eq(actors.id, actor.id))
+      .returning()
+      .get()
+    recordActivities(ctx, [
+      {
+        eventType: 'actor.renamed',
+        entityType: 'actor',
+        entityId: actor.id,
+        projectId: null,
+        before: { name: actor.name },
+        after: { name: updated.name },
+      },
+    ])
+    return updated
+  },
+})
+export const archiveAgentActor = defineOperation({
+  name: 'archive_agent_actor',
+  routes: ['web'],
+  requires: [],
+  returns: [],
+  entity: 'actor',
+  input: archiveAgentActorInput,
+  run: (ctx, input) => {
+    const actor = editableAgent(ctx, input.id)
+    if (getUnfinishedAssignedTasks(ctx, actor.id).length && !input.unassignTasks)
+      throw new NotAllowedError('未完了タスクを未割当に変更することへの同意が必要です')
+    if (input.unassignTasks) unassignUnfinishedActorTasks(ctx, actor.id)
+    for (const token of ctx.db
+      .select()
+      .from(tokens)
+      .where(and(eq(tokens.actorId, actor.id), isNull(tokens.revokedAt)))
+      .all())
+      revokeToken(ctx, { id: token.id })
+    const updated = ctx.db
+      .update(actors)
+      .set({ status: 'archived' })
+      .where(eq(actors.id, actor.id))
+      .returning()
+      .get()
+    recordActivities(ctx, [
+      {
+        eventType: 'actor.archived',
+        entityType: 'actor',
+        entityId: actor.id,
+        projectId: null,
+        before: { status: actor.status },
+        after: { status: updated.status },
+      },
+    ])
+    return updated
+  },
+})
+export const listActorDirectory = defineOperation({
+  name: 'list_actor_directory',
+  routes: ['web'],
+  requires: [],
+  returns: [],
+  entity: 'actor',
+  input: listActorsInput,
+  run: (ctx) =>
+    ctx.db
+      .select({
+        id: actors.id,
+        name: actors.name,
+        actorType: actors.actorType,
+        status: actors.status,
+      })
+      .from(actors)
+      .orderBy(asc(actors.id))
+      .all(),
+})
+
+export function assertActorActive(ctx: Ctx, id: number): void {
+  const actor = ctx.db.select().from(actors).where(eq(actors.id, id)).get()
+  if (!actor) throw new NotFoundError(`actor:${id} が見つかりません`)
+  if (actor.status !== 'active') throw new NotAllowedError('削除済みのActorは担当に指定できません')
+}
+
+/** MCP の取得結果から参照された Actor だけを、履歴用に解決する。 */
+export function readActorSummaries(ctx: Ctx, ids: number[]) {
+  if (!ids.length) return []
+  return ctx.db
+    .select({
+      id: actors.id,
+      name: actors.name,
+      actorType: actors.actorType,
+      status: actors.status,
+    })
+    .from(actors)
+    .where(inArray(actors.id, ids))
+    .orderBy(asc(actors.id))
+    .all()
+}

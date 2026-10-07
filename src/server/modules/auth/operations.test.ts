@@ -1,3 +1,12 @@
+import {
+  createTask,
+  addTaskComment,
+  startTask,
+  requestTaskReview,
+  approveTask,
+  getTaskOperation,
+} from '../task/index.js'
+import { tasks } from '../task/schema.js'
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { NotAllowedError, NotFoundError } from '../../core/errors.js'
@@ -7,9 +16,12 @@ import type { Database } from '../../db/connection.js'
 import { ctxFor, insertActor } from '../../testing/fixtures.js'
 import { expectRecorded } from '../../testing/recorded.js'
 import { activities } from '../activity/schema.js'
-import { humanCredentials, sessions, tokens } from './schema.js'
+import { actors, humanCredentials, sessions, tokens } from './schema.js'
 import {
   authenticateToken,
+  renameAgentActor,
+  archiveAgentActor,
+  listActorDirectory,
   createHumanAccount,
   createAgentActor,
   getAgentActor,
@@ -88,7 +100,9 @@ describe('agent Actor と Token', () => {
 
   it('担当候補は名前と種別だけを返す', () => {
     const result = listActors(ctx, {})
-    expect(result).toEqual([{ id: ctx.actor.id, name: ctx.actor.name, actorType: 'human' }])
+    expect(result).toEqual([
+      { id: ctx.actor.id, name: ctx.actor.name, actorType: 'human', status: 'active' },
+    ])
   })
 
   it('agent Actor の現在の権限を Settings 用に取得する', () => {
@@ -101,6 +115,8 @@ describe('agent Actor と Token', () => {
       id: agent.id,
       name: 'Codex',
       actorType: 'agent',
+      status: 'active',
+      unfinishedTaskCount: 0,
       permissions: { project: 'read', task: 'readwrite', document: 'none', inbox: 'read' },
     })
   })
@@ -225,4 +241,149 @@ describe('CLI 用 human アカウント操作', () => {
     })
     expect(database.db.select().from(activities).all()).toEqual([])
   })
+})
+
+describe('エージェントの名前変更と削除', () => {
+  it('空・重複・human の名前変更を拒否し、IDとトークンを維持する', () => {
+    const agent = insertActor(database, { name: '変更前' })
+    const token = issueToken(ctx, { id: agent.id })
+    expect(() => renameAgentActor(ctx, { id: agent.id, name: ' ' })).toThrow()
+    expect(() => renameAgentActor(ctx, { id: agent.id, name: ctx.actor.name })).toThrow(
+      NotAllowedError,
+    )
+    expect(() => renameAgentActor(ctx, { id: ctx.actor.id, name: '変更' })).toThrow(NotAllowedError)
+    expect(renameAgentActor(ctx, { id: agent.id, name: '変更後' })).toMatchObject({
+      id: agent.id,
+      name: '変更後',
+    })
+    expect(authenticateToken(database.db, token.token)).toMatchObject({
+      id: agent.id,
+      name: '変更後',
+    })
+    expect(
+      database.db.select().from(activities).where(eq(activities.eventType, 'actor.renamed')).get(),
+    ).toMatchObject({ before: { name: '変更前' }, after: { name: '変更後' } })
+  })
+
+  it('同意なしでは変更せず、同意後は未完了だけ解除し、履歴と完了担当を保持する', () => {
+    const agent = insertActor(database, { name: '削除対象' })
+    const first = issueToken(ctx, { id: agent.id })
+    const second = issueToken(ctx, { id: agent.id })
+    const old = issueToken(ctx, { id: agent.id })
+    const oldTime = '2026-09-15T12:00:00.000+09:00'
+    revokeToken({ ...ctx, now: oldTime }, { id: old.id })
+    const open = createTask(ctx, { title: '未完了', assigneeId: agent.id })
+    const done = createTask(ctxFor(database, agent), { title: '完了', assigneeId: agent.id })
+    addTaskComment(ctxFor(database, agent), { id: done.id, body: '履歴' })
+    startTask(ctx, { id: done.id })
+    requestTaskReview(ctx, { id: done.id, result: '成果' })
+    approveTask(ctx, { id: done.id })
+    const recorded = database.db.select().from(activities).all().length
+    expect(() => archiveAgentActor(ctx, { id: agent.id })).toThrow(NotAllowedError)
+    expect(authenticateToken(database.db, first.token)).not.toBeNull()
+    expect(database.db.select().from(activities).all()).toHaveLength(recorded)
+    archiveAgentActor(ctx, { id: agent.id, unassignTasks: true })
+    expect(database.db.select().from(tasks).where(eq(tasks.id, open.id)).get()).toMatchObject({
+      assigneeId: null,
+      version: open.version + 1,
+      updatedAt: ctx.now,
+      status: 'todo',
+    })
+    expect(getTaskOperation(ctx, { id: done.id })).toMatchObject({
+      assigneeId: agent.id,
+      createdBy: agent.id,
+      comments: [{ createdBy: agent.id, body: '履歴' }],
+    })
+    expect(authenticateToken(database.db, first.token)).toBeNull()
+    expect(authenticateToken(database.db, second.token)).toBeNull()
+    expect(database.db.select().from(tokens).where(eq(tokens.id, old.id)).get()?.revokedAt).toBe(
+      oldTime,
+    )
+    expect(listActors(ctx, {}).some((a) => a.id === agent.id)).toBe(false)
+    expect(listActorDirectory(ctx, {})).toContainEqual({
+      id: agent.id,
+      name: agent.name,
+      actorType: 'agent',
+      status: 'archived',
+    })
+    expect(() => issueToken(ctx, { id: agent.id })).toThrow(NotAllowedError)
+    expect(() => renameAgentActor(ctx, { id: agent.id, name: '再変更' })).toThrow(NotAllowedError)
+    expect(() => archiveAgentActor(ctx, { id: agent.id })).toThrow(NotAllowedError)
+    expect(() =>
+      updateAgentPermissions(ctx, { id: agent.id, permissions: agent.permissions }),
+    ).toThrow(NotAllowedError)
+    expect(() => createTask(ctx, { title: '再割当', assigneeId: agent.id })).toThrow(
+      NotAllowedError,
+    )
+    const replacement = createAgentActor(ctx, { name: agent.name, permissions: agent.permissions })
+    expect(replacement.id).not.toBe(agent.id)
+    expect(
+      database.db
+        .select()
+        .from(activities)
+        .where(eq(activities.eventType, 'task.auto_assignee_changed'))
+        .get(),
+    ).toMatchObject({
+      entityId: open.id,
+      actorId: ctx.actor.id,
+      before: { assigneeId: agent.id },
+      after: { assigneeId: null },
+    })
+  })
+
+  it('履歴記録の失敗時は担当解除・トークン失効・削除をすべてロールバックする', () => {
+    const agent = insertActor(database)
+    const token = issueToken(ctx, { id: agent.id })
+    const task = createTask(ctx, { title: 'ロールバック', assigneeId: agent.id })
+    database.sqlite.exec(
+      "CREATE TRIGGER reject_archive BEFORE INSERT ON activities WHEN NEW.event_type = 'actor.archived' BEGIN SELECT RAISE(ABORT, 'テスト用の失敗'); END",
+    )
+    expect(() => archiveAgentActor(ctx, { id: agent.id, unassignTasks: true })).toThrow()
+    expect(database.db.select().from(actors).where(eq(actors.id, agent.id)).get()?.status).toBe(
+      'active',
+    )
+    expect(authenticateToken(database.db, token.token)).not.toBeNull()
+    expect(database.db.select().from(tasks).where(eq(tasks.id, task.id)).get()).toEqual(task)
+    expect(
+      database.db
+        .select()
+        .from(activities)
+        .where(eq(activities.eventType, 'task.auto_assignee_changed'))
+        .all(),
+    ).toEqual([])
+  })
+
+  it('認証済みの操作は削除後も実行できるが次の認証は拒否する', () => {
+    const agent = insertActor(database)
+    const token = issueToken(ctx, { id: agent.id })
+    const authenticated = authenticateToken(database.db, token.token)!
+    archiveAgentActor(ctx, { id: agent.id })
+    expect(
+      createTask({ ...ctx, actor: authenticated, source: 'mcp' }, { title: '認証済み' }).createdBy,
+    ).toBe(agent.id)
+    expect(authenticateToken(database.db, token.token)).toBeNull()
+  })
+})
+
+it.each(['todo', 'in_progress', 'blocked', 'review', 'done', 'cancelled'] as const)(
+  '削除時の担当解除は %s の状態を判定する',
+  (state) => {
+    const agent = insertActor(database)
+    const task = createTask(ctx, { title: '状態ごとの確認', assigneeId: agent.id })
+    database.db.update(tasks).set({ status: state }).where(eq(tasks.id, task.id)).run()
+    archiveAgentActor(ctx, { id: agent.id, unassignTasks: true })
+    const saved = database.db.select().from(tasks).where(eq(tasks.id, task.id)).get()!
+    const finished = state === 'done' || state === 'cancelled'
+    expect(saved.assigneeId).toBe(finished ? agent.id : null)
+    expect(saved.version).toBe(task.version + (finished ? 0 : 1))
+    expect(saved.status).toBe(state)
+  },
+)
+
+it('未失効のトークンでも削除状態なら認証を拒否し、humanは削除できない', () => {
+  const agent = insertActor(database)
+  const token = issueToken(ctx, { id: agent.id })
+  database.db.update(actors).set({ status: 'archived' }).where(eq(actors.id, agent.id)).run()
+  expect(authenticateToken(database.db, token.token)).toBeNull()
+  expect(() => archiveAgentActor(ctx, { id: ctx.actor.id })).toThrow(NotAllowedError)
 })

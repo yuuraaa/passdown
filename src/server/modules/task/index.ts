@@ -40,3 +40,5 @@ export {
   taskStatuses,
   updateTaskInput,
 } from './inputs.js'
+
+export { getUnfinishedAssignedTasks, unassignUnfinishedActorTasks } from './operations.js'

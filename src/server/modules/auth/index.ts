@@ -28,3 +28,10 @@ export {
   tokenIdInput,
   updateAgentPermissionsInput,
 } from './inputs.js'
+
+export { renameAgentActor, archiveAgentActor, listActorDirectory } from './operations.js'
+export { renameAgentActorInput, archiveAgentActorInput, actorDirectoryQuery } from './inputs.js'
+
+export { assertActorActive } from './operations.js'
+
+export { readActorSummaries } from './operations.js'

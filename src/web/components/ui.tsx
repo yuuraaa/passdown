@@ -212,8 +212,16 @@ export function FilterChip({
   )
 }
 
-export function ActorDisplay({ actor }: { actor: { actorType: 'human' | 'agent'; name: string } }) {
-  const Icon = actor.actorType === 'agent' ? LuBot : LuCircleUserRound 
+export function ActorDisplay({
+  actor,
+}: {
+  actor:
+    | { actorType: 'human' | 'agent'; name: string; status?: 'active' | 'archived'; id?: number }
+    | null
+    | undefined
+}) {
+  if (!actor) return <span className="text-muted">Actorを読み込み中…</span>
+  const Icon = actor.actorType === 'agent' ? LuBot : LuCircleUserRound
 
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
@@ -224,6 +232,9 @@ export function ActorDisplay({ actor }: { actor: { actorType: 'human' | 'agent';
         <Icon size={14} />
       </span>
       {actor.name}
+      {actor.status === 'archived' && (
+        <span className="text-xs text-muted">削除済み #{actor.id}</span>
+      )}
     </span>
   )
 }
