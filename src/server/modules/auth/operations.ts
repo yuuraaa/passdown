@@ -193,6 +193,7 @@ export function authenticateToken(db: Db, token: string): Actor | null {
           eq(tokens.tokenHash, hashSecret(token)),
           isNull(tokens.revokedAt),
           eq(actors.actorType, 'agent'),
+          eq(actors.status, 'active'),
         ),
       )
       .get()
@@ -298,6 +299,7 @@ export const listActors = defineOperation({
         status: actors.status,
       })
       .from(actors)
+      .where(eq(actors.status, 'active'))
       .orderBy(asc(actors.id))
       .all(),
 })
@@ -377,6 +379,7 @@ export const updateAgentPermissions = defineOperation({
   run: (ctx, input) => {
     const actor = ctx.db.select().from(actors).where(eq(actors.id, input.id)).get()
     if (!actor) throw new NotFoundError(`actor:${input.id} が見つかりません`)
+    editableAgent(ctx, actor.id)
     checkCanChangeAgentPermissions(actor)
     const updated = ctx.db
       .update(actors)
@@ -438,6 +441,7 @@ export const issueToken = defineOperation({
   run: (ctx, input) => {
     const actor = ctx.db.select().from(actors).where(eq(actors.id, input.id)).get()
     if (!actor) throw new NotFoundError(`actor:${input.id} が見つかりません`)
+    editableAgent(ctx, actor.id)
     checkCanIssueToken(actor)
     const token = randomBytes(32).toString('base64url')
     const issued = ctx.db
@@ -595,3 +599,9 @@ export const listActorDirectory = defineOperation({
       .orderBy(asc(actors.id))
       .all(),
 })
+
+export function assertActorActive(ctx: Ctx, id: number): void {
+  const actor = ctx.db.select().from(actors).where(eq(actors.id, id)).get()
+  if (!actor) throw new NotFoundError(`actor:${id} が見つかりません`)
+  if (actor.status !== 'active') throw new NotAllowedError('削除済みのActorは担当に指定できません')
+}

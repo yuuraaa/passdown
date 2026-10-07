@@ -6,7 +6,7 @@ import {
   type ActivityRecord,
   recordActivities,
 } from '../activity/index.js'
-import { assertActorExists } from '../auth/index.js'
+import { assertActorActive } from '../auth/index.js'
 import { getDocument, readDocumentsByIds } from '../document/index.js'
 import { getProjectStatus } from '../project/index.js'
 import { escapeLikePattern } from '../search/index.js'
@@ -376,7 +376,7 @@ export const createTask = defineOperation({
     const projectId = resolveProjectOfNewTask(parent, input.projectId)
     if (parent) checkCanAddChild(parent)
     if (projectId !== null) checkProjectAcceptsTasks(projectId, getProjectStatus(ctx, projectId))
-    if (input.assigneeId !== undefined) assertActorExists(ctx, input.assigneeId)
+    if (input.assigneeId !== undefined) assertActorActive(ctx, input.assigneeId)
     const task = ctx.db
       .insert(tasks)
       .values({
@@ -561,7 +561,7 @@ export const updateTask = defineOperation({
       throw new ConflictError(
         `task:${before.id} はほかの操作で更新されました。読み直してからやり直してください`,
       )
-    if (input.assigneeId !== null) assertActorExists(ctx, input.assigneeId)
+    if (input.assigneeId !== null) assertActorActive(ctx, input.assigneeId)
     if (input.projectId !== null)
       checkProjectAcceptsTasks(input.projectId, getProjectStatus(ctx, input.projectId))
     if (before.parentId !== null && input.projectId !== before.projectId)
