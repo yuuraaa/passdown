@@ -11,6 +11,8 @@ export type Source = (typeof sources)[number]
 /** event_type の一覧（設計書 5.9） */
 export const eventTypes = [
   'actor.created',
+  'actor.renamed',
+  'actor.archived',
   'actor.permissions_changed',
   'token.issued',
   'token.revoked',
@@ -37,6 +39,7 @@ export const eventTypes = [
   'task.auto_started',
   'task.auto_cancelled',
   'task.auto_moved',
+  'task.auto_assignee_changed',
   'document.created',
   'document.updated',
   'document.archived',

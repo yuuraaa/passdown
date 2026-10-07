@@ -3,9 +3,12 @@ import { and, asc, eq, isNull, lte } from 'drizzle-orm'
 import { NotAllowedError, NotFoundError } from '../../core/errors.js'
 import { type Actor, type Ctx, defineOperation, type Db } from '../../core/operation.js'
 import { formatDatetime } from '../../core/time.js'
+import { getUnfinishedAssignedTasks, unassignUnfinishedActorTasks } from '../task/index.js'
 import { recordActivities } from '../activity/index.js'
 import {
   actorIdInput,
+  renameAgentActorInput,
+  archiveAgentActorInput,
   createAgentActorInput,
   createHumanAccountInput,
   listActorsInput,
@@ -288,7 +291,12 @@ export const listActors = defineOperation({
   input: listActorsInput,
   run: (ctx) =>
     ctx.db
-      .select({ id: actors.id, name: actors.name, actorType: actors.actorType })
+      .select({
+        id: actors.id,
+        name: actors.name,
+        actorType: actors.actorType,
+        status: actors.status,
+      })
       .from(actors)
       .orderBy(asc(actors.id))
       .all(),
@@ -310,6 +318,8 @@ export const getAgentActor = defineOperation({
       id: actor.id,
       name: actor.name,
       actorType: actor.actorType,
+      status: actor.status,
+      unfinishedTaskCount: getUnfinishedAssignedTasks(ctx, actor.id).length,
       permissions: permissionsOf(actor),
     }
   },
@@ -323,6 +333,14 @@ export const createAgentActor = defineOperation({
   entity: 'actor',
   input: createAgentActorInput,
   run: (ctx, input) => {
+    if (
+      ctx.db
+        .select({ id: actors.id })
+        .from(actors)
+        .where(and(eq(actors.name, input.name), eq(actors.status, 'active')))
+        .get()
+    )
+      throw new NotAllowedError('その名前は利用中のActorが使用しています')
     const actor = ctx.db
       .insert(actors)
       .values({
@@ -477,4 +495,103 @@ export const revokeToken = defineOperation({
     ])
     return revoked
   },
+})
+
+function editableAgent(ctx: Ctx, id: number): AuthActor {
+  const actor = ctx.db.select().from(actors).where(eq(actors.id, id)).get()
+  if (!actor) throw new NotFoundError(`actor:${id} が見つかりません`)
+  checkAgentActor(actor)
+  if (actor.status !== 'active') throw new NotAllowedError('削除済みのエージェントは変更できません')
+  return actor
+}
+export const renameAgentActor = defineOperation({
+  name: 'rename_agent_actor',
+  routes: ['web'],
+  requires: [],
+  returns: [],
+  entity: 'actor',
+  input: renameAgentActorInput,
+  run: (ctx, input) => {
+    const actor = editableAgent(ctx, input.id)
+    const duplicate = ctx.db
+      .select()
+      .from(actors)
+      .where(and(eq(actors.name, input.name), eq(actors.status, 'active')))
+      .get()
+    if (duplicate && duplicate.id !== actor.id)
+      throw new NotAllowedError('その名前は利用中のActorが使用しています')
+    const updated = ctx.db
+      .update(actors)
+      .set({ name: input.name })
+      .where(eq(actors.id, actor.id))
+      .returning()
+      .get()
+    recordActivities(ctx, [
+      {
+        eventType: 'actor.renamed',
+        entityType: 'actor',
+        entityId: actor.id,
+        projectId: null,
+        before: { name: actor.name },
+        after: { name: updated.name },
+      },
+    ])
+    return updated
+  },
+})
+export const archiveAgentActor = defineOperation({
+  name: 'archive_agent_actor',
+  routes: ['web'],
+  requires: [],
+  returns: [],
+  entity: 'actor',
+  input: archiveAgentActorInput,
+  run: (ctx, input) => {
+    const actor = editableAgent(ctx, input.id)
+    if (getUnfinishedAssignedTasks(ctx, actor.id).length && !input.unassignTasks)
+      throw new NotAllowedError('未完了タスクを未割当に変更することへの同意が必要です')
+    if (input.unassignTasks) unassignUnfinishedActorTasks(ctx, actor.id)
+    for (const token of ctx.db
+      .select()
+      .from(tokens)
+      .where(and(eq(tokens.actorId, actor.id), isNull(tokens.revokedAt)))
+      .all())
+      revokeToken(ctx, { id: token.id })
+    const updated = ctx.db
+      .update(actors)
+      .set({ status: 'archived' })
+      .where(eq(actors.id, actor.id))
+      .returning()
+      .get()
+    recordActivities(ctx, [
+      {
+        eventType: 'actor.archived',
+        entityType: 'actor',
+        entityId: actor.id,
+        projectId: null,
+        before: { status: actor.status },
+        after: { status: updated.status },
+      },
+    ])
+    return updated
+  },
+})
+export const listActorDirectory = defineOperation({
+  name: 'list_actor_directory',
+  routes: ['web'],
+  requires: [],
+  returns: [],
+  entity: 'actor',
+  input: listActorsInput,
+  run: (ctx) =>
+    ctx.db
+      .select({
+        id: actors.id,
+        name: actors.name,
+        actorType: actors.actorType,
+        status: actors.status,
+      })
+      .from(actors)
+      .orderBy(asc(actors.id))
+      .all(),
 })

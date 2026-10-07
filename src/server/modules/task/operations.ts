@@ -789,3 +789,25 @@ export const cancelTask = defineOperation({
     return cancelled
   },
 })
+
+/** auth 向け。未完了の判定と担当解除は Task モジュールに閉じる。 */
+export function getUnfinishedAssignedTasks(ctx: Ctx, actorId: number): Task[] {
+  return ctx.db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.assigneeId, actorId), notInArray(tasks.status, ['done', 'cancelled'])))
+    .all()
+}
+export function unassignUnfinishedActorTasks(ctx: Ctx, actorId: number): void {
+  for (const task of getUnfinishedAssignedTasks(ctx, actorId)) {
+    const updated = update(ctx, task, { assigneeId: null })
+    recordActivities(ctx, [
+      activity(
+        'task.auto_assignee_changed',
+        updated,
+        { assigneeId: actorId },
+        { assigneeId: null },
+      ),
+    ])
+  }
+}
