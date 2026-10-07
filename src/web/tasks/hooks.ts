@@ -15,7 +15,7 @@ export const taskQueryKeys = {
     ['tasks', 'list', ...statuses, projectId ?? null, assigneeId ?? null] as const,
   detail: (id: number) => ['tasks', id] as const,
   activities: (id: number) => ['tasks', id, 'activities'] as const,
-  actors: ['actors'] as const,
+  actors: ['actors', 'directory'] as const,
   projects: ['projects', 'task-options'] as const,
   documents: ['documents', 'task-options'] as const,
 }
@@ -61,7 +61,8 @@ export function useTaskActivities(id: number) {
 export function useActors() {
   return useQuery({
     queryKey: taskQueryKeys.actors,
-    queryFn: async () => readJson<Actor[]>(await api.actors.$get()),
+    queryFn: async () =>
+      readJson<Actor[]>(await api.actors.$get({ query: { includeArchived: 'true' } })),
   })
 }
 

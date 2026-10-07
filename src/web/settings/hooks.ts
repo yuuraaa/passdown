@@ -9,10 +9,15 @@ export const settingsQueryKeys = {
   activities: (id: number) => ['actors', id, 'activities'] as const,
 }
 
-export function useActors() {
+export function useActors(includeArchived = false) {
   return useQuery({
-    queryKey: settingsQueryKeys.actors,
-    queryFn: async () => readJson<Actor[]>(await api.actors.$get()),
+    queryKey: [...settingsQueryKeys.actors, includeArchived ? 'directory' : 'active'],
+    queryFn: async () =>
+      readJson<Actor[]>(
+        await api.actors.$get({
+          query: { includeArchived: String(includeArchived) as 'true' | 'false' },
+        }),
+      ),
   })
 }
 
@@ -52,7 +57,7 @@ export function useActivities(id: number) {
 export function useLatestActivities(agents: Actor[]) {
   return useQueries({
     queries: agents.map((agent) => ({
-      queryKey: settingsQueryKeys.activities(agent.id),
+      queryKey: [...settingsQueryKeys.activities(agent.id), 'latest'],
       queryFn: async () =>
         readJson<{ items: Activity[]; total: number }>(
           await api.actors[':id'].activities.$get({
@@ -125,5 +130,31 @@ export function useRevokeToken(actorId: number) {
     mutationFn: async (tokenId: number) =>
       readJson<Token>(await api.tokens[':id'].revoke.$post({ param: { id: String(tokenId) } })),
     onSuccess: () => invalidate(queryClient, actorId),
+  })
+}
+
+export function useRenameAgent(id: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (name: string) =>
+      readJson(await api.actors[':id'].$patch({ param: { id: String(id) }, json: { name } })),
+    onSuccess: () => invalidate(client, id),
+  })
+}
+export function useArchiveAgent(id: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (unassignTasks: boolean) =>
+      readJson(
+        await api.actors[':id'].archive.$post({
+          param: { id: String(id) },
+          json: { unassignTasks },
+        }),
+      ),
+    onSuccess: () => {
+      invalidate(client, id)
+      void client.invalidateQueries({ queryKey: ['tasks'] })
+      void client.invalidateQueries({ queryKey: ['projects'] })
+    },
   })
 }

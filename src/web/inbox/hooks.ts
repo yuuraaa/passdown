@@ -3,7 +3,7 @@ import { api, readJson } from '../lib/api.js'
 import type { Actor, InboxActivity, InboxItem, InboxItemStatus } from './types.js'
 
 export const inboxQueryKeys = {
-  actors: ['actors'] as const,
+  actors: ['actors', 'directory'] as const,
   list: (status: InboxItemStatus) => ['inbox-items', 'list', status] as const,
   detail: (id: number) => ['inbox-items', id] as const,
   activities: (id: number) => ['inbox-items', id, 'activities'] as const,
@@ -12,7 +12,8 @@ export const inboxQueryKeys = {
 export function useActors() {
   return useQuery({
     queryKey: inboxQueryKeys.actors,
-    queryFn: async () => readJson<Actor[]>(await api.actors.$get()),
+    queryFn: async () =>
+      readJson<Actor[]>(await api.actors.$get({ query: { includeArchived: 'true' } })),
   })
 }
 

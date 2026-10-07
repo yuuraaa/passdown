@@ -11,7 +11,7 @@ import type {
 } from './types.js'
 
 export const projectQueryKeys = {
-  actors: ['actors'] as const,
+  actors: ['actors', 'directory'] as const,
   list: (statuses: readonly ProjectStatus[]) => ['projects', 'list', ...statuses] as const,
   detail: (id: number) => ['projects', id] as const,
   tasks: (id: number, statuses: readonly TaskStatus[]) =>
@@ -66,7 +66,8 @@ export function useProjectActivities(id: number) {
 export function useActors() {
   return useQuery({
     queryKey: projectQueryKeys.actors,
-    queryFn: async () => readJson<Actor[]>(await api.actors.$get()),
+    queryFn: async () =>
+      readJson<Actor[]>(await api.actors.$get({ query: { includeArchived: 'true' } })),
   })
 }
 

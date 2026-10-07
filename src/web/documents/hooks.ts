@@ -3,7 +3,7 @@ import { api, readJson } from '../lib/api.js'
 import type { Activity, Actor, Document, DocumentReferences, DocumentStatus } from './types.js'
 
 export const documentQueryKeys = {
-  actors: ['actors'] as const,
+  actors: ['actors', 'directory'] as const,
   list: (status: DocumentStatus) => ['documents', 'list', status] as const,
   detail: (id: number) => ['documents', id] as const,
   tags: ['documents', 'tags'] as const,
@@ -14,7 +14,8 @@ export const documentQueryKeys = {
 export function useActors() {
   return useQuery({
     queryKey: documentQueryKeys.actors,
-    queryFn: async () => readJson<Actor[]>(await api.actors.$get()),
+    queryFn: async () =>
+      readJson<Actor[]>(await api.actors.$get({ query: { includeArchived: 'true' } })),
   })
 }
 export function useDocuments(status: DocumentStatus) {

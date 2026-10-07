@@ -203,6 +203,7 @@ export function SearchPage() {
               {(actors.data ?? []).map((actor) => (
                 <option key={actor.id} value={actor.id}>
                   {actor.name}
+                  {actor.status === 'archived' ? `（削除済み #${actor.id}）` : ''}
                 </option>
               ))}
             </Select>

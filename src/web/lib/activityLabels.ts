@@ -1,4 +1,7 @@
 export const activityLabels: Record<string, string> = {
+  'actor.renamed': 'エージェント名を変更しました',
+  'actor.archived': 'エージェントを削除しました',
+  'task.auto_assignee_changed': 'エージェント削除に伴い担当を解除しました',
   'actor.created': 'エージェントを作成しました',
   'actor.permissions_changed': 'エージェントの権限を変更しました',
   'token.issued': 'トークンを発行しました',
