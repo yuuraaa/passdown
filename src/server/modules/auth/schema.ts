@@ -1,4 +1,5 @@
-import { check, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { sql } from 'drizzle-orm'
+import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { datetime, inValues } from '../../core/columns.js'
 import { actorTypes, permissions } from './inputs.js'
 
@@ -7,13 +8,18 @@ export const actors = sqliteTable(
   {
     id: integer().primaryKey({ autoIncrement: true }),
     actorType: text({ enum: actorTypes }).notNull(),
-    name: text().notNull().unique(),
+    name: text().notNull(),
+    status: text({ enum: ['active', 'archived'] })
+      .notNull()
+      .default('active'),
     permProject: text({ enum: permissions }).notNull(),
     permTask: text({ enum: permissions }).notNull(),
     permDocument: text({ enum: permissions }).notNull(),
     permInbox: text({ enum: permissions }).notNull(),
   },
   (t) => [
+    uniqueIndex('actors_active_name_unique').on(t.name).where(sql`${t.status} = 'active'`),
+    check('actors_status_check', inValues(t.status, ['active', 'archived'])),
     check('actors_actor_type_check', inValues(t.actorType, actorTypes)),
     check('actors_perm_project_check', inValues(t.permProject, permissions)),
     check('actors_perm_task_check', inValues(t.permTask, permissions)),
