@@ -9,6 +9,7 @@ import {
   type McpOperation,
 } from '../core/operation.js'
 import { formatDatetime } from '../core/time.js'
+import { readActorSummaries } from '../modules/auth/index.js'
 import { getExistingDocumentTags } from '../modules/document/index.js'
 import { descriptionWithDocumentTags, toolDescriptions } from './descriptions.js'
 import { toMcpIds, toMcpInputSchema } from './ids.js'
@@ -56,7 +57,34 @@ function registerOperation(server: McpServer, deps: McpDeps, actor: Actor, op: M
     (input: unknown) => {
       const ctx: Ctx = { db: deps.db, actor, source: 'mcp', now: formatDatetime(deps.now()) }
       try {
-        const result = toMcpIds(op(ctx, input), op.entity)
+        const result = ctx.db.transaction((db) => {
+          const transactionCtx = { ...ctx, db }
+          const value = toMcpIds(op(transactionCtx, input), op.entity)
+          if (op.name === 'list_actors') return value
+          const ids = new Set<number>()
+          const collect = (node: unknown): void => {
+            if (Array.isArray(node)) {
+              node.forEach(collect)
+              return
+            }
+            if (!node || typeof node !== 'object') return
+            for (const [key, entry] of Object.entries(node)) {
+              if (
+                ['id', 'assigneeId', 'createdBy', 'updatedBy', 'actorId'].includes(key) &&
+                typeof entry === 'string' &&
+                /^actor:[1-9][0-9]*$/.test(entry)
+              )
+                ids.add(Number(entry.slice(6)))
+              if (typeof entry === 'object') collect(entry)
+            }
+          }
+          collect(value)
+          if (!ids.size || !value || typeof value !== 'object') return value
+          const summaries = toMcpIds(readActorSummaries(transactionCtx, [...ids]), 'actor')
+          return Array.isArray(value)
+            ? { items: value, actors: summaries }
+            : { ...value, actors: summaries }
+        })
         return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] }
       } catch (err) {
         return toolError(err)

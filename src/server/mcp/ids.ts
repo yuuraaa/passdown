@@ -88,6 +88,15 @@ export function toMcpIds(value: unknown, entity: EntityType): unknown {
       if (key === 'items') {
         return [key, toMcpIds(v, entity)]
       }
+      if (key === 'comments' && Array.isArray(v)) {
+        return [
+          key,
+          (v as Record<string, unknown>[]).map((comment) => ({
+            ...(toMcpIds(comment, 'task') as Record<string, unknown>),
+            id: `comment:${String(comment.id)}`,
+          })),
+        ]
+      }
       if (key === 'matchedComments' && Array.isArray(v)) {
         return [
           key,

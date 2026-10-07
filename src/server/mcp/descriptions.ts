@@ -18,7 +18,8 @@ export const toolDescriptions: Record<string, string> = {
     'active な Project の項目と参照 Document を更新する。更新前に読み、version を渡す。状態は変更できない。',
   get_project_context:
     'Project の概要・instructions、終わっていない Task、参照する active Document を作業文脈として取得する。詳細は個別のツールで読む。',
-  list_actors: 'Task の担当に指定できる Actor の名前と種別を返す。権限やトークンは返さない。',
+  list_actors:
+    'Task の担当に指定できる利用中の Actor の名前・種別・状態を返す。権限やトークンは返さない。',
   create_task:
     'Task を作る。何をするか（description）と何を満たせば完了か（acceptanceCriteria）を書き、必要なら担当・親 Task・Project を指定する。作った Task は todo になる。',
   start_task:

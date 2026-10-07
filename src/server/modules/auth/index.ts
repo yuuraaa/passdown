@@ -34,3 +34,4 @@ export { renameAgentActorInput, archiveAgentActorInput, actorDirectoryQuery } fr
 
 export { assertActorActive } from './operations.js'
 
+export { readActorSummaries } from './operations.js'

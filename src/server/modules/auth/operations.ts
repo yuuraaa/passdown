@@ -1,5 +1,5 @@
 import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
-import { and, asc, eq, isNull, lte } from 'drizzle-orm'
+import { and, asc, eq, isNull, lte, inArray } from 'drizzle-orm'
 import { NotAllowedError, NotFoundError } from '../../core/errors.js'
 import { type Actor, type Ctx, defineOperation, type Db } from '../../core/operation.js'
 import { formatDatetime } from '../../core/time.js'
@@ -604,4 +604,20 @@ export function assertActorActive(ctx: Ctx, id: number): void {
   const actor = ctx.db.select().from(actors).where(eq(actors.id, id)).get()
   if (!actor) throw new NotFoundError(`actor:${id} が見つかりません`)
   if (actor.status !== 'active') throw new NotAllowedError('削除済みのActorは担当に指定できません')
+}
+
+/** MCP の取得結果から参照された Actor だけを、履歴用に解決する。 */
+export function readActorSummaries(ctx: Ctx, ids: number[]) {
+  if (!ids.length) return []
+  return ctx.db
+    .select({
+      id: actors.id,
+      name: actors.name,
+      actorType: actors.actorType,
+      status: actors.status,
+    })
+    .from(actors)
+    .where(inArray(actors.id, ids))
+    .orderBy(asc(actors.id))
+    .all()
 }
