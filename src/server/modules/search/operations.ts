@@ -17,7 +17,7 @@ function toStoredDatetime(value: string | undefined): string | undefined {
   return value === undefined ? undefined : formatDatetime(new Date(value))
 }
 
-/** Task と Document を横断する検索の入口（設計書 3章・4.5）。 */
+/** Task と Document を横断する検索の入口（docs/architecture/Search.md 3章・docs/architecture/Software.md 4.5）。 */
 export const search = defineOperation({
   name: 'search',
   routes: ['web', 'mcp'],

@@ -17,7 +17,7 @@ import { toMcpIds, toMcpInputSchema } from './ids.js'
 export type McpDeps = {
   db: Db
   now: () => Date
-  /** MCP に出す操作。routes に 'mcp' を含むものしか受け付けない（設計書 4.9） */
+  /** MCP に出す操作。routes に 'mcp' を含むものしか受け付けない（docs/architecture/Software.md 4.9） */
   operations: readonly McpOperation[]
 }
 
@@ -26,7 +26,7 @@ function toolError(err: unknown) {
   if (err instanceof AppError) {
     message = err.message
   } else {
-    // 想定外のエラーの詳細は返さず、ログに残す（設計書 4.6）
+    // 想定外のエラーの詳細は返さず、ログに残す（docs/architecture/Software.md 4.6）
     console.error(err)
     message = 'サーバーで想定外のエラーが起きました'
   }
@@ -94,7 +94,7 @@ function registerOperation(server: McpServer, deps: McpDeps, actor: Actor, op: M
 }
 
 /**
- * リクエストのたびに、Actor の権限に合うツールだけを登録したサーバーを作る（設計書 2.3）。
+ * リクエストのたびに、Actor の権限に合うツールだけを登録したサーバーを作る（docs/architecture/Technology.md 2.3）。
  * 権限外のツールは表示しない（要件定義書 F-AUTH-04）。
  */
 export function buildMcpServer(deps: McpDeps, actor: Actor): McpServer {

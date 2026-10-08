@@ -27,7 +27,7 @@ const envSchema = z.object({
     .default(60 * 60 * 1000),
   PASSDOWN_HOST: z.string().min(1).default('0.0.0.0'),
   PASSDOWN_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  // 既定値を持たせると検証が緩いまま気づかず運用できてしまうため、必須にする（設計書 2.9）
+  // 既定値を持たせると検証が緩いまま気づかず運用できてしまうため、必須にする（docs/architecture/Technology.md 2.9）
   PASSDOWN_MCP_ALLOWED_HOSTS: hostList,
   PASSDOWN_BACKUP_KEEP_DAILY: z.coerce.number().int().min(1).default(14),
   PASSDOWN_BACKUP_KEEP_MIGRATION: z.coerce.number().int().min(1).default(5),
@@ -51,7 +51,7 @@ export function loadBackupPaths(env: NodeJS.ProcessEnv) {
   return envSchema.pick({ PASSDOWN_DB_PATH: true, PASSDOWN_BACKUP_DIR: true }).parse(env)
 }
 
-/** 環境変数を起動時に1か所で読んで検証する。足りなければ例外を投げる（設計書 2.9） */
+/** 環境変数を起動時に1か所で読んで検証する。足りなければ例外を投げる（docs/architecture/Technology.md 2.9） */
 export function loadConfig(env: NodeJS.ProcessEnv): Config {
   const result = envSchema.safeParse(env)
   if (!result.success) {

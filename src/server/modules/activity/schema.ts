@@ -10,7 +10,7 @@ export const activities = sqliteTable(
     id: integer().primaryKey({ autoIncrement: true }),
     eventType: text({ enum: eventTypes }).notNull(),
     entityType: text({ enum: entityTypes }).notNull(),
-    // 対象のテーブルが種類ごとに違うため、外部キーは張らない（設計書 5.9）
+    // 対象のテーブルが種類ごとに違うため、外部キーは張らない（docs/architecture/Database.md 5.9）
     entityId: integer().notNull(),
     projectId: integer().references(() => projects.id),
     actorId: integer()

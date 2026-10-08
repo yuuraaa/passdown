@@ -28,7 +28,7 @@ export const actors = sqliteTable(
   ],
 )
 
-/** ログインの情報。actors と分け、Actor を読んだときにハッシュが混ざらないようにする（設計書 5.2） */
+/** ログインの情報。actors と分け、Actor を読んだときにハッシュが混ざらないようにする（docs/architecture/Database.md 5.2） */
 export const humanCredentials = sqliteTable('human_credentials', {
   actorId: integer()
     .primaryKey()

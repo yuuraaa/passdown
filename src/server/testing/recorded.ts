@@ -24,7 +24,7 @@ export function changedTables(before: Snapshot, after: Snapshot): string[] {
 
 /**
  * 操作を呼び、activities 以外のテーブルが変わったのに activities が増えていなければ失敗させる。
- * Activity の記録の呼び忘れを、操作の関数のテストで共通に捕まえる（設計書 4.9）。
+ * Activity の記録の呼び忘れを、操作の関数のテストで共通に捕まえる（docs/architecture/Software.md 4.9）。
  */
 export function expectRecorded<T>(database: Database, call: () => T): T {
   const before = snapshotTables(database)

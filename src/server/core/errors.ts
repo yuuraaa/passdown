@@ -1,5 +1,5 @@
 /**
- * 業務のエラー（設計書 4.6）。種類はこの5つと「想定外」（これら以外の例外）に限る。
+ * 業務のエラー（docs/architecture/Software.md 4.6）。種類はこの5つと「想定外」（これら以外の例外）に限る。
  * 種類を足すときは、経路の層の変換（http/errors.ts・mcp/errors.ts）もあわせて直す。
  */
 export type AppErrorType = 'invalid_input' | 'forbidden' | 'not_found' | 'not_allowed' | 'conflict'

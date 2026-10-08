@@ -26,9 +26,9 @@ docker compose -f docker/compose.dev.yaml exec passdown bash
 ```
 
 - `docker/compose.dev.yaml` と `docker/Dockerfile.dev` は開発用。本番用は `docker/compose.prod.yaml` と `docker/Dockerfile.prod`
-- 開発環境ではホストの `./data` をコンテナの `/data` にバインドマウントし、DB とバックアップを置く（設計書 2.9）。本番 Compose は named volume を使う。`data/` は git の対象外
+- 開発環境ではホストの `./data` をコンテナの `/data` にバインドマウントし、DB とバックアップを置く（[技術スタック「コンテナとデプロイ」](docs/architecture/Technology.md#section-2-9)）。本番 Compose は named volume を使う。`data/` は git の対象外
 - ホスト側の公開ポートは既定で 3100（`PASSDOWN_DEV_PORT` で変えられる）。コンテナの中では 3000 で待ち受ける
-- 使う道具は設計書 2.8（npm・Drizzle 0.45 系・ESLint ＋ eslint-plugin-boundaries・Biome の formatter）
+- 使う道具は[技術スタック「開発環境の道具」](docs/architecture/Technology.md#section-2-8)（npm・Drizzle 0.45 系・ESLint ＋ eslint-plugin-boundaries・Biome の formatter）
 
 ## ドキュメント
 

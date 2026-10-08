@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { EntityType } from '../core/operation.js'
 
 /**
- * MCP では id を `<種類>:<id>` の文字列で受け渡す（設計書 5.1）。
+ * MCP では id を `<種類>:<id>` の文字列で受け渡す（docs/architecture/Database.md 5.1）。
  * 変換は MCP の層のこの1か所に閉じ、業務ロジックの層と REST API は数値の id を使う。
  */
 

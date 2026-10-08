@@ -18,7 +18,7 @@ export type ActivityPage = { items: Activity[]; total: number }
 export type TaskStatusChange = { before: string; after: string }
 
 /**
- * Activity を記録する（設計書 4.9）。Actor・経路・日時は ctx の値をそのまま使う。
+ * Activity を記録する（docs/architecture/Software.md 4.9）。Actor・経路・日時は ctx の値をそのまま使う。
  * 他のモジュールから呼ばれるだけの関数のため、defineOperation を使わない。
  */
 export function recordActivities(ctx: Ctx, records: readonly ActivityRecord[]): void {

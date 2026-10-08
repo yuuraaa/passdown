@@ -17,7 +17,7 @@ import { changedTables, expectRecorded, snapshotTables } from './testing/recorde
 import { createHarness, type Harness, scenarios } from './testing/scenarios.js'
 
 /**
- * 起点の操作の一覧（レジストリ）から表駆動で回すテスト（設計書 4.9）。
+ * 起点の操作の一覧（レジストリ）から表駆動で回すテスト（docs/architecture/Software.md 4.9）。
  * 操作を足せば、ここのテストも自動で増える。
  */
 

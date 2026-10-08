@@ -9,7 +9,7 @@ export const SESSION_COOKIE = 'passdown_session'
 
 /**
  * REST API はログインのセッション（Cookie）だけを受け付け、Authorization ヘッダを読まない。
- * これでエージェントのトークンは REST API に使えない（設計書 4.9）。
+ * これでエージェントのトークンは REST API に使えない（docs/architecture/Software.md 4.9）。
  */
 export function sessionAuth(deps: RouteDeps) {
   return createMiddleware<ApiEnv>(async (c, next) => {
