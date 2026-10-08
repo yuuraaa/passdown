@@ -16,7 +16,8 @@ passdown は、人間と AI エージェントが Task を通じて協働する�
 
 ## 開発環境
 
-開発作業はコンテナの中で行う。
+- ファイルの閲覧・検索・作成・編集・移動などのファイル操作と Git 操作は、ホスト側で行う。
+- アプリケーションの実行・依存関係のインストール・ビルド・テスト・lint・formatter の実行は、コンテナ内で行う。
 
 ```bash
 docker compose -f docker/compose.dev.yaml build
