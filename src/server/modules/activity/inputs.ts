@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-/** Activity の対象の種類。画面・MCP で `<種類>:<id>` と書くときの語でもある（設計書 5.1・5.9） */
+/** Activity の対象の種類。画面・MCP で `<種類>:<id>` と書くときの語でもある（docs/architecture/Database.md 5.1・docs/architecture/Database.md 5.9） */
 export const entityTypes = ['actor', 'token', 'project', 'task', 'document', 'inbox_item'] as const
 export type EntityTypeValue = (typeof entityTypes)[number]
 
@@ -8,7 +8,7 @@ export type EntityTypeValue = (typeof entityTypes)[number]
 export const sources = ['web', 'mcp'] as const
 export type Source = (typeof sources)[number]
 
-/** event_type の一覧（設計書 5.9） */
+/** event_type の一覧（docs/architecture/Database.md 5.9） */
 export const eventTypes = [
   'actor.created',
   'actor.renamed',
@@ -52,7 +52,7 @@ export type EventType = (typeof eventTypes)[number]
 
 const activityFields = z.record(z.string(), z.json())
 
-/** 他モジュールが Activity を記録するときの入力（設計書 5.9） */
+/** 他モジュールが Activity を記録するときの入力（docs/architecture/Database.md 5.9） */
 export const activityRecordInput = z
   .object({
     eventType: z.enum(eventTypes),
@@ -93,7 +93,7 @@ export const activityRecordInput = z
 /** 他モジュールへ公開する記録型。before / after は省略不可にする。 */
 export type ActivityRecordInput = z.output<typeof activityRecordInput>
 
-/** Activity の一覧に共通するページング。足した順（id 昇順）で返す（設計書 4.10・7.4） */
+/** Activity の一覧に共通するページング。足した順（id 昇順）で返す（docs/architecture/Software.md 4.10・docs/architecture/REST_API.md 7.4） */
 export const activityPageInput = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
@@ -121,7 +121,7 @@ export const actorActivitiesInput = activityPageInput.extend({
 
 /**
  * 他の行を指す id の入力。REST API と業務ロジックは数値で受け取り、
- * MCP の層は meta の種類を見て `<種類>:<id>` の文字列を受け取る形に変える（設計書 5.1）。
+ * MCP の層は meta の種類を見て `<種類>:<id>` の文字列を受け取る形に変える（docs/architecture/Database.md 5.1）。
  */
 export function entityId(entityType: EntityTypeValue) {
   return z.number().int().positive().meta({ entityType })

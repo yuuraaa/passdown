@@ -40,7 +40,7 @@ const FAILURE_LIMIT = 1000
 const INITIAL_FAILURE_DELAY_MS = 1000
 const MAX_FAILURE_DELAY_MS = 30_000
 
-/** ログイン失敗をログイン名単位で一時的に保持する。DB には保存しない（設計書 5.3）。 */
+/** ログイン失敗をログイン名単位で一時的に保持する。DB には保存しない（docs/architecture/Database.md 5.3）。 */
 export class LoginFailureTracker {
   private readonly failures = new Map<string, { count: number; lastFailedAt: number }>()
 
@@ -234,7 +234,7 @@ export async function login(
     .innerJoin(actors, eq(humanCredentials.actorId, actors.id))
     .where(eq(humanCredentials.loginName, parsed.loginName))
     .get()
-  // 成否にかかわらず、ログインの処理で期限切れのセッションを掃除する（設計書 5.3）。
+  // 成否にかかわらず、ログインの処理で期限切れのセッションを掃除する（docs/architecture/Database.md 5.3）。
   db.transaction((tx) => tx.delete(sessions).where(lte(sessions.expiresAt, now)).run())
   const dummy = await hashPassword('passdown-invalid-login')
   const verified = await verifyPassword(parsed.password, credential?.passwordHash ?? dummy)

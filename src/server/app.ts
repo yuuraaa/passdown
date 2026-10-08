@@ -14,7 +14,7 @@ export type AppDeps = {
   webRoot?: string
 }
 
-/** 1つのプロセスで Web UI・REST API・MCP を受け持つ（設計書 1章） */
+/** 1つのプロセスで Web UI・REST API・MCP を受け持つ（docs/Architecture.md 1章） */
 export function createApp(deps: AppDeps) {
   const app = new Hono()
   app.route('/api', createApi(deps))
@@ -28,7 +28,7 @@ export function createApp(deps: AppDeps) {
     }),
   )
   if (deps.webRoot) {
-    // /api・/mcp 以外は Web UI の静的ファイル、当たらなければ index.html（設計書 7.1）
+    // /api・/mcp 以外は Web UI の静的ファイル、当たらなければ index.html（docs/architecture/REST_API.md 7.1）
     app.use('*', serveStatic({ root: deps.webRoot }))
     app.get('*', serveStatic({ root: deps.webRoot, path: 'index.html' }))
   }

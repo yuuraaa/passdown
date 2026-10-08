@@ -70,7 +70,7 @@ docker compose -f docker/compose.dev.yaml exec passdown npm test
 ## ドキュメント
 
 - [要件定義書 v1](docs/Requirements.md) — 目的、利用シナリオ、機能の範囲
-- [アーキテクチャ設計書](docs/Architecture.md) — 構成と設計判断
+- [アーキテクチャ設計書](docs/Architecture.md) — 全体構成と各詳細設計への入口
 - [本番環境の起動手順](docs/Operations.md) — 設定、起動、更新、停止
 - [バックアップからの復元手順書](docs/Backup_Operations.md) — バックアップと復元
 

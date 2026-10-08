@@ -35,7 +35,7 @@ function schemaStatements(): Promise<string[]> {
   return statements
 }
 
-/** テスト用のインメモリの DB（設計書 4.3）。テストごとに作り、分離する */
+/** テスト用のインメモリの DB（docs/architecture/Software.md 4.3）。テストごとに作り、分離する */
 export async function createTestDatabase(): Promise<Database> {
   const database = openDatabase(':memory:')
   for (const statement of await schemaStatements()) {

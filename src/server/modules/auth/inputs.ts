@@ -3,7 +3,7 @@ import { entityId } from '../activity/inputs.js'
 
 export const actorTypes = ['human', 'agent'] as const
 
-/** リソースごとの権限（設計書 5.2） */
+/** リソースごとの権限（docs/architecture/Database.md 5.2） */
 export const permissions = ['none', 'read', 'readwrite'] as const
 export type Permission = (typeof permissions)[number]
 

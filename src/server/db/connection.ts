@@ -2,8 +2,8 @@ import Sqlite from 'better-sqlite3'
 import { type BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3'
 
 /**
- * SQLite を開く。接続のたびに外部キーの検査を有効にする（設計書 5.1）。
- * 接続のインスタンスは起動処理だけが持ち、業務ロジックの層には ctx.db で渡す（設計書 4.2）。
+ * SQLite を開く。接続のたびに外部キーの検査を有効にする（docs/architecture/Database.md 5.1）。
+ * 接続のインスタンスは起動処理だけが持ち、業務ロジックの層には ctx.db で渡す（docs/architecture/Software.md 4.2）。
  */
 export type Database = {
   sqlite: Sqlite.Database

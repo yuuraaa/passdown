@@ -37,7 +37,7 @@ beforeEach(async () => {
   cookie = `passdown_session=${insertSession(database, owner, new Date(FIXED_NOW.getTime() + 13 * DAY))}`
 })
 
-/** Web UI と同じく Hono RPC で呼ぶ（設計書 2.4） */
+/** Web UI と同じく Hono RPC で呼ぶ（docs/architecture/Technology.md 2.4） */
 function client(headers: Record<string, string> = { Cookie: cookie }) {
   return hc<ApiType>('http://localhost/api', {
     headers,

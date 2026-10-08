@@ -3,7 +3,7 @@ import boundaries from 'eslint-plugin-boundaries'
 import tseslint from 'typescript-eslint'
 
 /**
- * 設計書 2.8 の5つの規則を eslint-plugin-boundaries で機械的に守る。
+ * docs/architecture/Technology.md 2.8 の5つの規則を eslint-plugin-boundaries で機械的に守る。
  *
  * 要素の種類（boundaries/elements）はフォルダ単位、モジュールの中のファイルの役割
  * （boundaries/files）はファイル単位で宣言する。モジュール名は capture（family）で
@@ -40,7 +40,7 @@ export default tseslint.config(
         },
       },
       'boundaries/elements': [
-        // 業務ロジックの層。モジュール名を family として取る（設計書 4.4）
+        // 業務ロジックの層。モジュール名を family として取る（docs/architecture/Software.md 4.4）
         {
           type: 'module',
           pattern: 'src/server/modules/*',
@@ -49,7 +49,7 @@ export default tseslint.config(
         },
         // DB への接続・マイグレーション
         { type: 'db', pattern: 'src/server/db', partialMatch: false },
-        // 経路の層（設計書 4.1）
+        // 経路の層（docs/architecture/Software.md 4.1）
         { type: 'route', pattern: 'src/server/http', partialMatch: false },
         { type: 'route', pattern: 'src/server/mcp', partialMatch: false },
         // 共通の仕組み（defineOperation・エラー・日時・列の型）
@@ -101,7 +101,7 @@ export default tseslint.config(
               allow: { to: { element: { type: 'core' } } },
             },
 
-            // 規則2: モジュールの外からは index.ts だけを import する（設計書 4.5・D-102）。
+            // 規則2: モジュールの外からは index.ts だけを import する（docs/architecture/Software.md 4.5・D-102）。
             // 規則1（操作の関数から他のモジュールの schema.ts を import しない）も、
             // index.ts 以外を許可しないことで同時に守られる
             {
@@ -115,7 +115,7 @@ export default tseslint.config(
               allow: { to: { element: { type: 'module' }, file: { categories: 'index' } } },
             },
             // 規則2の例外: schema.ts は外部キーの参照のため、他のモジュールの
-            // schema.ts を import してよい（設計書 4.5）
+            // schema.ts を import してよい（docs/architecture/Software.md 4.5）
             {
               from: { element: { type: 'module' }, file: { categories: 'schema' } },
               allow: { to: { element: { type: 'module' }, file: { categories: 'schema' } } },
@@ -128,7 +128,7 @@ export default tseslint.config(
             },
 
             // 規則5: inputs.ts が import してよいのは zod と、他のモジュールの
-            // inputs.ts だけ（設計書 4.7）。ブラウザでも動かすため
+            // inputs.ts だけ（docs/architecture/Software.md 4.7）。ブラウザでも動かすため
             {
               from: { element: { type: 'module' }, file: { categories: 'inputs' } },
               disallow: { to: { element: { type: '*' } } },
@@ -156,7 +156,7 @@ export default tseslint.config(
               ],
             },
             // CLI は DB 初期化と auth モジュールの公開 API だけに依存する。
-            // schema.ts・operations.ts を含む内部実装は import しない（設計書 4.5）。
+            // schema.ts・operations.ts を含む内部実装は import しない（docs/architecture/Software.md 4.5）。
             {
               from: { element: { type: 'cli' } },
               allow: [
@@ -180,7 +180,7 @@ export default tseslint.config(
               allow: { to: { element: { type: 'module' }, file: { categories: 'schema' } } },
             },
 
-            // 業務ロジックの層から、経路の層・Hono・MCP SDK を import しない（設計書 4.4）
+            // 業務ロジックの層から、経路の層・Hono・MCP SDK を import しない（docs/architecture/Software.md 4.4）
             {
               from: { element: { type: 'module' } },
               disallow: [
@@ -206,7 +206,7 @@ export default tseslint.config(
             },
 
             // 判定の関数は DB を使わない。db/・SQLite ドライバー・Drizzle・操作の関数を
-            // import しない（設計書 4.2・4.4）。他のモジュールの index.ts からは import type だけ
+            // import しない（docs/architecture/Software.md 4.2・docs/architecture/Software.md 4.4）。他のモジュールの index.ts からは import type だけ
             {
               from: { element: { type: 'module' }, file: { categories: 'rules' } },
               disallow: [
@@ -230,14 +230,14 @@ export default tseslint.config(
                 '判定の関数から他のモジュールの index.ts を import するときは import type にしてください（設計書 4.2）',
             },
 
-            // db/ は業務ロジックの層から import しない。接続は ctx.db で受け取る（設計書 4.4）
+            // db/ は業務ロジックの層から import しない。接続は ctx.db で受け取る（docs/architecture/Software.md 4.4）
             {
               from: { element: { type: 'module' } },
               disallow: { to: { element: { type: 'db' } } },
               message: 'DB の接続は import せず ctx.db を使ってください（設計書 4.2・4.4）',
             },
 
-            // 経路の層から使ってよいのは modules/*/index.ts だけ（設計書 4.4）
+            // 経路の層から使ってよいのは modules/*/index.ts だけ（docs/architecture/Software.md 4.4）
             {
               from: { element: { type: 'route' } },
               disallow: { to: { element: { type: 'module' } } },
@@ -248,7 +248,7 @@ export default tseslint.config(
               from: { element: { type: 'route' } },
               allow: { to: { element: { type: 'module' }, file: { categories: 'index' } } },
             },
-            // 規則3: 経路の層から DB を読み書きしない（設計書 4.1）。
+            // 規則3: 経路の層から DB を読み書きしない（docs/architecture/Software.md 4.1）。
             // db/・他モジュールの schema.ts・SQLite のドライバー・Drizzle のすべてを塞ぐ
             {
               from: { element: { type: 'route' } },
@@ -260,7 +260,7 @@ export default tseslint.config(
               message: '経路の層から DB を読み書きしないでください（設計書 4.1）',
             },
 
-            // 規則4: Web UI にサーバーの実行コードを含めない（設計書 4.8・D-101）。
+            // 規則4: Web UI にサーバーの実行コードを含めない（docs/architecture/Software.md 4.8・D-101）。
             // 実行時に import してよいのは modules/*/inputs.ts だけで、
             // それ以外のサーバーのコードは import type でだけ参照してよい
             {
@@ -307,7 +307,7 @@ export default tseslint.config(
       ],
     },
   },
-  // 業務ロジックの層では try / catch を書かない（設計書 4.2・4.6）。
+  // 業務ロジックの層では try / catch を書かない（docs/architecture/Software.md 4.2・docs/architecture/Software.md 4.6）。
   // SQLite のエラーを投げ直す場合だけ、無効化のコメントに理由を書いて使う
   {
     files: ['src/server/modules/**/*.ts'],
@@ -323,7 +323,7 @@ export default tseslint.config(
       ],
     },
   },
-  // 経路の層から、権限を確認しない呼び口を呼ばない（設計書 4.9）
+  // 経路の層から、権限を確認しない呼び口を呼ばない（docs/architecture/Software.md 4.9）
   {
     files: ['src/server/http/**/*.ts', 'src/server/mcp/**/*.ts'],
     rules: {

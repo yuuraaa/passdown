@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { ForbiddenError, InvalidInputError } from './errors.js'
 
 /**
- * 操作の関数が使う DB。接続とトランザクションのどちらも入る（設計書 4.2）。
+ * 操作の関数が使う DB。接続とトランザクションのどちらも入る（docs/architecture/Software.md 4.2）。
  * 業務ロジックの層は、DB の接続を import せず、必ず ctx.db を使う。
  */
 export type Db = BaseSQLiteDatabase<'sync', RunResult>
@@ -13,10 +13,10 @@ export type Resource = 'project' | 'task' | 'document' | 'inbox'
 export type PermissionLevel = 'read' | 'readwrite'
 export type Permission = 'none' | PermissionLevel
 export type Route = 'web' | 'mcp'
-/** 操作を出す経路の組（設計書 4.9）。人間だけの操作は ['web'] */
+/** 操作を出す経路の組（docs/architecture/Software.md 4.9）。人間だけの操作は ['web'] */
 export type Routes = readonly ['web'] | readonly ['web', 'mcp']
 
-/** 操作した Actor。権限は Actor が持つ（設計書 5.2） */
+/** 操作した Actor。権限は Actor が持つ（docs/architecture/Database.md 5.2） */
 export type Actor = {
   id: number
   name: string
@@ -24,8 +24,8 @@ export type Actor = {
 }
 
 /**
- * 操作の関数が受け取る文脈（設計書 4.1）。
- * 他のモジュールの関数を呼ぶときも actor・source を差し替えない（設計書 4.9）。
+ * 操作の関数が受け取る文脈（docs/architecture/Software.md 4.1）。
+ * 他のモジュールの関数を呼ぶときも actor・source を差し替えない（docs/architecture/Software.md 4.9）。
  */
 export type Ctx = {
   db: Db
@@ -35,7 +35,7 @@ export type Ctx = {
   now: string
 }
 
-/** 画面・MCP で `<種類>:<id>` の形で書く種類（設計書 5.1） */
+/** 画面・MCP で `<種類>:<id>` の形で書く種類（docs/architecture/Database.md 5.1） */
 export type EntityType = 'actor' | 'token' | 'project' | 'task' | 'document' | 'inbox_item'
 
 type Input = z.ZodObject
@@ -51,9 +51,9 @@ export type OperationDef<N extends string, R extends Routes, I extends Input, O>
   returns: readonly Resource[]
   /** 結果が表すリソースの種類。MCP の層で結果の `id` を `<種類>:<id>` に変える */
   entity: EntityType
-  /** 入力のスキーマ（設計書 4.7） */
+  /** 入力のスキーマ（docs/architecture/Software.md 4.7） */
   input: I
-  /** 読む → 判定する → 書く（設計書 4.2）。ctx.db はトランザクション */
+  /** 読む → 判定する → 書く（docs/architecture/Software.md 4.2）。ctx.db はトランザクション */
   run: (ctx: Ctx, input: z.output<I>) => O
 }
 
@@ -69,7 +69,7 @@ export type Operation<N extends string, R extends Routes, I extends Input, O> = 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 入力の型は操作ごとに違い、関数の引数は可変のため any で受ける
 export type AnyOperation = Operation<string, Routes, any, unknown>
 
-/** MCP に出してよい操作。MCP への登録はこの型しか受け付けない（設計書 4.9） */
+/** MCP に出してよい操作。MCP への登録はこの型しか受け付けない（docs/architecture/Software.md 4.9） */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AnyOperation と同じ
 export type McpOperation = Operation<string, readonly ['web', 'mcp'], any, unknown>
 
@@ -91,7 +91,7 @@ export function hasPermission(
   return level === 'read' ? granted !== 'none' : granted === 'readwrite'
 }
 
-/** 操作の関数の先頭で、自分の入力のスキーマで検証する（設計書 4.7） */
+/** 操作の関数の先頭で、自分の入力のスキーマで検証する（docs/architecture/Software.md 4.7） */
 export function parseInput<I extends Input>(schema: I, input: unknown): z.output<I> {
   const result = schema.safeParse(input)
   if (!result.success) {
@@ -101,7 +101,7 @@ export function parseInput<I extends Input>(schema: I, input: unknown): z.output
 }
 
 /**
- * 起点の操作を宣言する（設計書 4.9）。
+ * 起点の操作を宣言する（docs/architecture/Software.md 4.9）。
  * 返す関数は、入力の検証 → 権限の確認 → トランザクションを張って run を実行、の順に行う。
  */
 export function defineOperation<const N extends string, const R extends Routes, I extends Input, O>(

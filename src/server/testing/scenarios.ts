@@ -26,13 +26,13 @@ export type Scenario = {
   arrange: (h: Harness) => unknown
   /**
    * returns に宣言したリソースごとに、read を持たない Actor で呼んだ結果に
-   * そのリソースが含まれていないかを確かめる（設計書 4.9）
+   * そのリソースが含まれていないかを確かめる（docs/architecture/Software.md 4.9）
    */
   excludes?: Partial<Record<Resource, (result: unknown) => boolean>>
 }
 
 /**
- * 起点の操作ごとの、成功する入力とデータの用意（設計書 4.9 の表駆動のテスト）。
+ * 起点の操作ごとの、成功する入力とデータの用意（docs/architecture/Software.md 4.9 の表駆動のテスト）。
  * 操作を足したらここにも足す。足し忘れると表駆動のテストが失敗する。
  */
 export const scenarios: Record<string, Scenario> = {

@@ -12,7 +12,7 @@ declare module 'hono' {
 }
 
 export type McpAppDeps = McpDeps & {
-  /** Host・Origin で許可するホスト名（設計書 2.9） */
+  /** Host・Origin で許可するホスト名（docs/architecture/Technology.md 2.9） */
   allowedHosts: string[]
 }
 
@@ -22,8 +22,8 @@ function bearerToken(header: string | undefined): string | null {
 }
 
 /**
- * MCP（/mcp）。Bearer トークンだけを受け付け、Cookie を読まない（設計書 4.9）。
- * SDK はトークンを検証しないため、手前で検証して Actor を authInfo として渡す（設計書 2.3）。
+ * MCP（/mcp）。Bearer トークンだけを受け付け、Cookie を読まない（docs/architecture/Software.md 4.9）。
+ * SDK はトークンを検証しないため、手前で検証して Actor を authInfo として渡す（docs/architecture/Technology.md 2.3）。
  */
 export function createMcpApp(deps: McpAppDeps) {
   const app = createMcpHonoApp({

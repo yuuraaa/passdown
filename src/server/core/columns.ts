@@ -3,7 +3,7 @@ import { customType } from 'drizzle-orm/sqlite-core'
 import { DATETIME_PATTERN } from './time.js'
 
 /**
- * 日時の列（設計書 5.1）。TEXT で保存し、決まった形式でない値は書かせない。
+ * 日時の列（docs/architecture/Database.md 5.1）。TEXT で保存し、決まった形式でない値は書かせない。
  * 値は ctx.now（formatDatetime で作った文字列）を渡す。
  */
 export const datetime = customType<{ data: string; driverData: string }>({
@@ -17,7 +17,7 @@ export const datetime = customType<{ data: string; driverData: string }>({
 })
 
 /**
- * 列挙値の CHECK 制約の式（設計書 5.1）。CHECK にはパラメータを使えないため、
+ * 列挙値の CHECK 制約の式（docs/architecture/Database.md 5.1）。CHECK にはパラメータを使えないため、
  * inputs.ts に置いた定数の値を SQL のリテラルとして埋め込む。
  */
 export function inValues(column: AnyColumn, values: readonly string[]): SQL {
