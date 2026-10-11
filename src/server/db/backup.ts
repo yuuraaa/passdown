@@ -1,9 +1,9 @@
 import { constants } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { mkdir, readdir, copyFile, rm, rename, stat } from 'node:fs/promises'
-import { join } from "node:path";
+import { join } from 'node:path'
 import Sqlite from 'better-sqlite3'
-import type { MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from 'hono'
 import { formatDatetime } from '../core/time.js'
 
 const DAILY_PATTERN = /^passdown-(\d{8})-(\d{6})\.sqlite3$/
@@ -23,7 +23,11 @@ export type BackupServiceOptions = {
   keep: number
 }
 
-export async function createBackup(db: Sqlite.Database, directory: string, now: Date = new Date()): Promise<void> {
+export async function createBackup(
+  db: Sqlite.Database,
+  directory: string,
+  now: Date = new Date(),
+): Promise<void> {
   await mkdir(directory, { recursive: true })
 
   const jst = formatDatetime(now)
@@ -35,8 +39,14 @@ export async function createBackup(db: Sqlite.Database, directory: string, now: 
   await db.backup(destination)
 }
 
-export async function shouldBackup(backupDirectory: string, intervalMs: number, now: Date = new Date()): Promise<boolean> {
-  const latestBackup = (await listBackups(backupDirectory)).find((backup) => backup.kind === 'daily')
+export async function shouldBackup(
+  backupDirectory: string,
+  intervalMs: number,
+  now: Date = new Date(),
+): Promise<boolean> {
+  const latestBackup = (await listBackups(backupDirectory)).find(
+    (backup) => backup.kind === 'daily',
+  )
 
   if (!latestBackup) {
     return true
@@ -52,15 +62,13 @@ export async function runBackupIfNeeded(
   options: BackupServiceOptions,
   now: Date = new Date(),
 ): Promise<void> {
-  const required = await shouldBackup(
-    options.directory,
-    options.intervalMs,
-    now,
-  )
+  const required = await shouldBackup(options.directory, options.intervalMs, now)
 
   if (required) {
     await createBackup(sqlite, options.directory, now)
-    const backups = (await listBackups(options.directory)).filter((backup) => backup.kind === 'daily')
+    const backups = (await listBackups(options.directory)).filter(
+      (backup) => backup.kind === 'daily',
+    )
     for (const backup of backups.slice(options.keep)) {
       await rm(backup.path)
     }
@@ -91,15 +99,20 @@ export async function listBackups(directory: string): Promise<Backup[]> {
       const createdAt = new Date(stamp)
       if (Number.isNaN(createdAt.getTime())) return []
       const kind = daily ? 'daily' : 'before-migration'
-      return [{
-        path: join(directory, entry.name),
-        filename: entry.name,
-        createdAt,
-        id: `${day}-${time}${migration ? `.${milliseconds}` : ''}`,
-        kind,
-      }]
+      return [
+        {
+          path: join(directory, entry.name),
+          filename: entry.name,
+          createdAt,
+          id: `${day}-${time}${migration ? `.${milliseconds}` : ''}`,
+          kind,
+        },
+      ]
     })
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.filename.localeCompare(b.filename))
+    .sort(
+      (a, b) =>
+        b.createdAt.getTime() - a.createdAt.getTime() || a.filename.localeCompare(b.filename),
+    )
 }
 
 export async function restoreBackup(

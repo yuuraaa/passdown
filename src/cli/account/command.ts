@@ -2,7 +2,6 @@ import type { Db } from '../../server/core/operation.js'
 import { createHumanAccount, resetHumanPassword } from '../../server/modules/auth/index.js'
 import { type CliIo } from '../types.js'
 
-
 export type AccountCommandDeps = {
   readonly db: Db
   readonly io: CliIo
@@ -10,9 +9,11 @@ export type AccountCommandDeps = {
 
 export const usage = '使い方: passdown account <create | reset-password>\n'
 
-
 /** 対話入力がすべて成功するまで DB を変更しない。 */
-export async function runAccountCommand(args: readonly string[], { db, io }: AccountCommandDeps): Promise<number> {
+export async function runAccountCommand(
+  args: readonly string[],
+  { db, io }: AccountCommandDeps,
+): Promise<number> {
   if (!io.isTTY) {
     io.write('このコマンドは TTY で対話的に実行してください。\n')
     return 1
@@ -45,7 +46,7 @@ export async function runAccountCommand(args: readonly string[], { db, io }: Acc
       const loginName = await io.ask('ログイン名: ')
       const password = await io.askPassword('新しいパスワード: ')
       const confirmation = await io.askPassword('新しいパスワード（確認）: ')
-      
+
       if (password !== confirmation) {
         io.write('パスワードが一致しません。\n')
         return 1

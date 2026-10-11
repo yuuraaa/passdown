@@ -10,9 +10,15 @@ import type { CliIo } from '../types.js'
 class FakeIo implements CliIo {
   isTTY = false
   readonly output: string[] = []
-  ask(): Promise<string> { throw new Error('対話入力は不要です') }
-  askPassword(): Promise<string> { throw new Error('対話入力は不要です') }
-  write(message: string): void { this.output.push(message) }
+  ask(): Promise<string> {
+    throw new Error('対話入力は不要です')
+  }
+  askPassword(): Promise<string> {
+    throw new Error('対話入力は不要です')
+  }
+  write(message: string): void {
+    this.output.push(message)
+  }
 }
 
 let dir: string
@@ -88,7 +94,11 @@ describe('backup CLI', () => {
     } finally {
       restored.close()
     }
-    expect(readdirSync(dir).filter((name) => name.includes('before-restore')).sort()).toHaveLength(3)
+    expect(
+      readdirSync(dir)
+        .filter((name) => name.includes('before-restore'))
+        .sort(),
+    ).toHaveLength(3)
     expect(existsSync(join(backupPath, 'passdown-20260923-101530.sqlite3'))).toBe(true)
   })
 

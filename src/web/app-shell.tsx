@@ -1,12 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router'
-import {
-  LuInbox,
-  LuFolder,
-  LuListTodo,
-  LuFileText,
-  LuSettings,
-  LuSearch
-} from 'react-icons/lu'
+import { LuInbox, LuFolder, LuListTodo, LuFileText, LuSettings, LuSearch } from 'react-icons/lu'
 import { useLogout, useSession } from './auth.js'
 import { ActorDisplay, Button } from './components/ui.js'
 import { ThemeSelector } from './components/theme.js'
@@ -33,7 +26,7 @@ function Brand() {
   )
 }
 
-function NavItem({ item, mobile = false}: NavItemProps) {
+function NavItem({ item, mobile = false }: NavItemProps) {
   const Icon = item.icon
 
   return (
@@ -55,11 +48,7 @@ function NavItems({ mobile = false }: { mobile?: boolean }) {
   return (
     <nav className={mobile ? 'grid grid-cols-5' : 'grid gap-1'} aria-label="主なナビゲーション">
       {navigation.map((item) => (
-        <NavItem
-          key={item.to}
-          item={item}
-          mobile={mobile}
-        />
+        <NavItem key={item.to} item={item} mobile={mobile} />
       ))}
     </nav>
   )
@@ -80,7 +69,8 @@ export function AppShell() {
             void navigate('/search')
           }}
         >
-          <LuSearch size={20} />検索 
+          <LuSearch size={20} />
+          検索
         </button>
         <NavItems />
         <div className="mt-auto grid gap-3 border-t border-line px-2 pt-4 text-xs text-muted">

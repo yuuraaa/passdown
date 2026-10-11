@@ -36,9 +36,7 @@ describe('account CLI', () => {
   it('表示名が空ならログイン名で作成し、パスワードを出力しない', async () => {
     const io = new FakeIo(['owner', '', 'secret-password', 'secret-password'])
 
-    await expect(
-      runAccountCommand(['create'], { db: database.db, io }),
-    ).resolves.toBe(0)
+    await expect(runAccountCommand(['create'], { db: database.db, io })).resolves.toBe(0)
 
     expect(database.db.select().from(humanCredentials).get()).toMatchObject({
       loginName: 'owner',
@@ -52,9 +50,7 @@ describe('account CLI', () => {
   it('確認不一致では書き込まない', async () => {
     const io = new FakeIo(['owner', '', 'one', 'two'])
 
-    await expect(
-      runAccountCommand(['create'], { db: database.db, io }),
-    ).resolves.toBe(1)
+    await expect(runAccountCommand(['create'], { db: database.db, io })).resolves.toBe(1)
 
     expect(database.db.select().from(humanCredentials).all()).toEqual([])
   })
@@ -63,9 +59,7 @@ describe('account CLI', () => {
     const io = new FakeIo([])
     io.isTTY = false
 
-    await expect(
-      runAccountCommand(['create'], { db: database.db, io }),
-    ).resolves.toBe(1)
+    await expect(runAccountCommand(['create'], { db: database.db, io })).resolves.toBe(1)
 
     expect(database.db.select().from(humanCredentials).all()).toEqual([])
   })
@@ -73,9 +67,7 @@ describe('account CLI', () => {
   it('不正な account コマンドでは書き込まない', async () => {
     const io = new FakeIo([])
 
-    await expect(
-      runAccountCommand(['unknown'], { db: database.db, io }),
-    ).resolves.toBe(1)
+    await expect(runAccountCommand(['unknown'], { db: database.db, io })).resolves.toBe(1)
 
     expect(database.db.select().from(humanCredentials).all()).toEqual([])
   })

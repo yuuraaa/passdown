@@ -19,10 +19,10 @@ export default defineConfig({
       usePolling: true,
     },
     proxy: {
-      "/api": {
-        target: "http://passdown:3000",
-      }
-    }
+      '/api': {
+        target: 'http://passdown:3000',
+      },
+    },
   },
   test: {
     root: import.meta.dirname,

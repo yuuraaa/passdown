@@ -12,8 +12,7 @@ export type CliDeps = {
 
 export const usage = '使い方: passdown <account | backup>\n'
 
-export async function runCli(args: readonly string[], deps: CliDeps): Promise<number>
-{
+export async function runCli(args: readonly string[], deps: CliDeps): Promise<number> {
   switch (args[0]) {
     case 'account':
       if (!deps.db) throw new Error('account コマンドには DB 接続が必要です。')
