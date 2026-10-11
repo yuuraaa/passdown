@@ -16,7 +16,14 @@ let dir: string
 let backupDir: string
 let db: Sqlite.Database
 
-function jstDate(year: number, month: number, day: number, hour: number, minute: number, second: number): Date {
+function jstDate(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+): Date {
   return new Date(Date.UTC(year, month, day, hour - 9, minute, second))
 }
 
@@ -53,9 +60,7 @@ describe('createBackup', () => {
 
     await createBackup(db, backupDir, now)
 
-    expect(backupFiles()).toEqual([
-      'passdown-20260923-123456.sqlite3',
-    ])
+    expect(backupFiles()).toEqual(['passdown-20260923-123456.sqlite3'])
   })
 
   it('バックアップには実行時点のDB内容が含まれる', async () => {
@@ -65,18 +70,12 @@ describe('createBackup', () => {
 
     await createBackup(db, backupDir, now)
 
-    const backupPath = join(
-      backupDir,
-      'passdown-20260923-120000.sqlite3',
-    )
+    const backupPath = join(backupDir, 'passdown-20260923-120000.sqlite3')
 
     const backup = new Sqlite(backupPath, { readonly: true })
 
     try {
-      const users = backup
-        .prepare('select name from users order by id')
-        .pluck()
-        .all()
+      const users = backup.prepare('select name from users order by id').pluck().all()
 
       expect(users).toEqual(['Alice'])
     } finally {
@@ -91,21 +90,9 @@ describe('listBackups', () => {
   })
 
   it('バックアップファイルだけを新しい順で返す', async () => {
-    await createBackup(
-      db,
-      backupDir,
-      jstDate(2026, 8, 21, 12, 0, 0),
-    )
-    await createBackup(
-      db,
-      backupDir,
-      jstDate(2026, 8, 23, 12, 0, 0),
-    )
-    await createBackup(
-      db,
-      backupDir,
-      jstDate(2026, 8, 22, 12, 0, 0),
-    )
+    await createBackup(db, backupDir, jstDate(2026, 8, 21, 12, 0, 0))
+    await createBackup(db, backupDir, jstDate(2026, 8, 23, 12, 0, 0))
+    await createBackup(db, backupDir, jstDate(2026, 8, 22, 12, 0, 0))
 
     writeFileSync(join(backupDir, 'other.txt'), '')
     writeFileSync(join(backupDir, 'passdown-invalid.sqlite3'), '')
@@ -135,15 +122,13 @@ describe('shouldBackup', () => {
     mkdirSync(backupDir, { recursive: true })
     writeFileSync(join(backupDir, 'before-migration-20260923T120000.000.sqlite3'), '')
 
-    expect(await shouldBackup(backupDir, 24 * 60 * 60 * 1000, jstDate(2026, 8, 23, 13, 0, 0))).toBe(true)
+    expect(await shouldBackup(backupDir, 24 * 60 * 60 * 1000, jstDate(2026, 8, 23, 13, 0, 0))).toBe(
+      true,
+    )
   })
 
   it('前回バックアップから指定時間未満ならfalseを返す', async () => {
-    await createBackup(
-      db,
-      backupDir,
-      jstDate(2026, 8, 23, 0, 0, 0),
-    )
+    await createBackup(db, backupDir, jstDate(2026, 8, 23, 0, 0, 0))
 
     const result = await shouldBackup(
       backupDir,
@@ -155,11 +140,7 @@ describe('shouldBackup', () => {
   })
 
   it('前回バックアップから指定時間以上経過していればtrueを返す', async () => {
-    await createBackup(
-      db,
-      backupDir,
-      jstDate(2026, 8, 22, 12, 0, 0),
-    )
+    await createBackup(db, backupDir, jstDate(2026, 8, 22, 12, 0, 0))
 
     const result = await shouldBackup(
       backupDir,
@@ -185,17 +166,11 @@ describe('runBackupIfNeeded', () => {
       now,
     )
 
-    expect(backupFiles()).toEqual([
-      'passdown-20260923-120000.sqlite3',
-    ])
+    expect(backupFiles()).toEqual(['passdown-20260923-120000.sqlite3'])
   })
 
   it('指定時間が経過していなければ作成しない', async () => {
-    await createBackup(
-      db,
-      backupDir,
-      jstDate(2026, 8, 23, 0, 0, 0),
-    )
+    await createBackup(db, backupDir, jstDate(2026, 8, 23, 0, 0, 0))
 
     await runBackupIfNeeded(
       db,
@@ -207,17 +182,11 @@ describe('runBackupIfNeeded', () => {
       jstDate(2026, 8, 23, 12, 0, 0),
     )
 
-    expect(backupFiles()).toEqual([
-      'passdown-20260923-000000.sqlite3',
-    ])
+    expect(backupFiles()).toEqual(['passdown-20260923-000000.sqlite3'])
   })
 
   it('指定時間が経過していれば新しいバックアップを作成する', async () => {
-    await createBackup(
-      db,
-      backupDir,
-      jstDate(2026, 8, 22, 12, 0, 0),
-    )
+    await createBackup(db, backupDir, jstDate(2026, 8, 22, 12, 0, 0))
 
     await runBackupIfNeeded(
       db,
@@ -265,22 +234,14 @@ describe('backupMiddleware', () => {
 
     vi.setSystemTime(jstDate(2026, 8, 23, 12, 0, 0))
 
-    const middleware = backupMiddleware(
-      db,
-      backupDir,
-      24 * 60 * 60 * 1000,
-      60 * 60 * 1000,
-      14,
-    )
+    const middleware = backupMiddleware(db, backupDir, 24 * 60 * 60 * 1000, 60 * 60 * 1000, 14)
 
     const next = vi.fn(async () => {})
 
     // 初回リクエストなのでバックアップされる
     await middleware({} as never, next)
 
-    expect(backupFiles()).toEqual([
-      'passdown-20260923-120000.sqlite3',
-    ])
+    expect(backupFiles()).toEqual(['passdown-20260923-120000.sqlite3'])
 
     // 30分後。チェック間隔の1時間に達していない
     vi.setSystemTime(jstDate(2026, 8, 23, 12, 30, 0))
@@ -320,10 +281,7 @@ describe('restoreBackup', () => {
     const backupTime = jstDate(2026, 8, 23, 12, 0, 0)
     await createBackup(db, backupDir, backupTime)
 
-    const backupPath = join(
-      backupDir,
-      'passdown-20260923-120000.sqlite3',
-    )
+    const backupPath = join(backupDir, 'passdown-20260923-120000.sqlite3')
 
     // バックアップ取得後にDBを変更する
     db.prepare('insert into users (name) values (?)').run('after backup')
@@ -335,10 +293,7 @@ describe('restoreBackup', () => {
     const restored = new Sqlite(databasePath)
 
     try {
-      const users = restored
-        .prepare('select name from users order by id')
-        .pluck()
-        .all()
+      const users = restored.prepare('select name from users order by id').pluck().all()
 
       expect(users).toEqual(['before backup'])
     } finally {
@@ -352,9 +307,7 @@ describe('restoreBackup', () => {
 
     db.close()
 
-    await expect(
-      restoreBackup(backupPath, databasePath),
-    ).rejects.toThrow()
+    await expect(restoreBackup(backupPath, databasePath)).rejects.toThrow()
   })
 
   it('リストアに失敗した場合は一時ファイルを残さない', async () => {
@@ -363,13 +316,9 @@ describe('restoreBackup', () => {
 
     db.close()
 
-    await expect(
-      restoreBackup(backupPath, databasePath),
-    ).rejects.toThrow()
+    await expect(restoreBackup(backupPath, databasePath)).rejects.toThrow()
 
-    expect(
-      existsSync(`${databasePath}.restore`),
-    ).toBe(false)
+    expect(existsSync(`${databasePath}.restore`)).toBe(false)
   })
 
   it('壊れたバックアップは現行 DB を退避せずに拒否する', async () => {
@@ -382,10 +331,16 @@ describe('restoreBackup', () => {
     await expect(restoreBackup(invalidBackup, databasePath)).rejects.toThrow()
     const current = new Sqlite(databasePath, { readonly: true })
     try {
-      expect(current.prepare('select name from sqlite_master where name = ?').get('users')).toBeDefined()
+      expect(
+        current.prepare('select name from sqlite_master where name = ?').get('users'),
+      ).toBeDefined()
     } finally {
       current.close()
     }
-    expect(readdirSync(dir).filter((name) => name.includes('before-restore') || name.includes('.restore-'))).toEqual([])
+    expect(
+      readdirSync(dir).filter(
+        (name) => name.includes('before-restore') || name.includes('.restore-'),
+      ),
+    ).toEqual([])
   })
 })

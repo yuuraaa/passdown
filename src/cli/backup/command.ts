@@ -17,11 +17,18 @@ function describeBackup(backup: Backup): string {
 
 async function showListBackups({ io, backup_path }: BackupCommandDeps): Promise<number> {
   const backups = await listBackups(backup_path)
-  io.write(backups.length === 0 ? 'バックアップはありません。\n' : `${backups.map(describeBackup).join('\n')}\n`)
+  io.write(
+    backups.length === 0
+      ? 'バックアップはありません。\n'
+      : `${backups.map(describeBackup).join('\n')}\n`,
+  )
   return 0
 }
 
-async function showRestoreBackup(id: string, { io, db_path, backup_path }: BackupCommandDeps): Promise<number> {
+async function showRestoreBackup(
+  id: string,
+  { io, db_path, backup_path }: BackupCommandDeps,
+): Promise<number> {
   if (!BACKUP_ID.test(id)) {
     io.write(restoreUsage)
     return 1
@@ -29,16 +36,19 @@ async function showRestoreBackup(id: string, { io, db_path, backup_path }: Backu
 
   const backups = await listBackups(backup_path)
   const exact = backups.filter((backup) => backup.id === id)
-  const matches = exact.length > 0
-    ? exact
-    : backups.filter((backup) => backup.id.startsWith(`${id}${id.length === 8 ? '-' : '.'}`))
+  const matches =
+    exact.length > 0
+      ? exact
+      : backups.filter((backup) => backup.id.startsWith(`${id}${id.length === 8 ? '-' : '.'}`))
 
   if (matches.length === 0) {
     io.write(`該当するバックアップがありません: ${id}\n`)
     return 1
   }
   if (matches.length > 1) {
-    io.write(`複数のバックアップが該当します: ${id}\n${matches.map(describeBackup).join('\n')}\n日時を詳しく指定してください。\n`)
+    io.write(
+      `複数のバックアップが該当します: ${id}\n${matches.map(describeBackup).join('\n')}\n日時を詳しく指定してください。\n`,
+    )
     return 1
   }
 
@@ -49,7 +59,10 @@ async function showRestoreBackup(id: string, { io, db_path, backup_path }: Backu
   return 0
 }
 
-export async function runBackupCommand(args: readonly string[], deps: BackupCommandDeps): Promise<number> {
+export async function runBackupCommand(
+  args: readonly string[],
+  deps: BackupCommandDeps,
+): Promise<number> {
   switch (args[0]) {
     case 'list':
       if (args.length !== 1) {
