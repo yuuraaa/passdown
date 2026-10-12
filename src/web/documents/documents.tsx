@@ -1,7 +1,6 @@
+import { MarkdownContent } from '../components/markdown.js'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import Markdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { createDocumentInput, updateDocumentInput } from '../../server/modules/document/inputs.js'
 import {
   ActorDisplay,
@@ -296,13 +295,8 @@ export function DocumentDetailPage() {
         <Card className="p-5 md:p-7">
           <div className="mb-4 flex justify-between gap-3">
             <h2 className="font-semibold">本文</h2>
-            <span className="text-sm text-muted">Markdown表示（HTMLは描画しません）</span>
           </div>
-          <article className="prose max-w-none">
-            <Markdown remarkPlugins={[remarkGfm]} skipHtml>
-              {item.content}
-            </Markdown>
-          </article>
+          <MarkdownContent>{item.content}</MarkdownContent>
         </Card>
         <Card className="p-5">
           <dl className="grid gap-4 text-sm">
