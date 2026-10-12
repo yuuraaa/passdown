@@ -76,3 +76,120 @@
     outline-offset: 2px;
   }
 }
+
+@layer components {
+  .markdown-content {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    line-height: 1.7;
+  }
+  .markdown-content > :first-child {
+    margin-top: 0;
+  }
+  .markdown-content > :last-child {
+    margin-bottom: 0;
+  }
+  .markdown-content
+    :where(p, ul, ol, blockquote, pre, .markdown-table, .mermaid-diagram, .mermaid-fallback) {
+    margin-block: 1em;
+  }
+  .markdown-content :where(h1, h2, h3, h4, h5, h6) {
+    margin-block: 1.4em 0.6em;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+  .markdown-content h1 {
+    font-size: 1.75em;
+  }
+  .markdown-content h2 {
+    font-size: 1.5em;
+  }
+  .markdown-content h3 {
+    font-size: 1.25em;
+  }
+  .markdown-content h4 {
+    font-size: 1.1em;
+  }
+  .markdown-content :where(ul, ol) {
+    padding-left: 1.6em;
+  }
+  .markdown-content ul {
+    list-style: disc;
+  }
+  .markdown-content ol {
+    list-style: decimal;
+  }
+  .markdown-content li > :where(ul, ol) {
+    margin-block: 0.25em;
+  }
+  .markdown-content .contains-task-list {
+    list-style: none;
+    padding-left: 0;
+  }
+  .markdown-content .task-list-item > input {
+    margin-right: 0.5em;
+    accent-color: var(--color-accent);
+  }
+  .markdown-content a {
+    color: var(--color-accent);
+    text-decoration: underline;
+  }
+  .markdown-content blockquote {
+    padding-left: 1em;
+    border-left: 3px solid var(--color-line);
+    color: var(--color-muted);
+  }
+  .markdown-content :where(code, pre) {
+    font-family: ui-monospace, monospace;
+    font-size: 0.9em;
+  }
+  .markdown-content code {
+    background: var(--color-canvas);
+    border-radius: 0.25rem;
+    padding: 0.15em 0.3em;
+  }
+  .markdown-content pre {
+    overflow-x: auto;
+    padding: 1rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-ui);
+    background: var(--color-canvas);
+    overflow-wrap: normal;
+  }
+  .markdown-content pre code {
+    padding: 0;
+    background: none;
+    font-size: inherit;
+  }
+  .markdown-content .markdown-table {
+    overflow-x: auto;
+  }
+  .markdown-content table {
+    border-collapse: collapse;
+    width: max-content;
+    min-width: 100%;
+  }
+  .markdown-content :where(th, td) {
+    border: 1px solid var(--color-line);
+    padding: 0.5em 0.75em;
+  }
+  .markdown-content th {
+    background: var(--color-canvas);
+    font-weight: 600;
+  }
+  .markdown-content img {
+    max-width: 100%;
+    height: auto;
+  }
+  .markdown-content hr {
+    margin-block: 1.5em;
+    border-color: var(--color-line);
+  }
+  .markdown-content .mermaid-diagram {
+    overflow-x: auto;
+  }
+  .markdown-content .mermaid-diagram > svg {
+    max-width: none !important;
+    height: auto;
+  }
+}

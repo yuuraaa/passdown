@@ -111,7 +111,7 @@ export function Select({
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-ui border border-line bg-surface ${className}`}>
+    <section className={`min-w-0 rounded-ui border border-line bg-surface ${className}`}>
       {children}
     </section>
   )
