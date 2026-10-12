@@ -1,3 +1,4 @@
+import { MarkdownContent } from '../components/markdown.js'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
@@ -606,27 +607,33 @@ export function TaskDetailPage() {
         <div className="grid gap-5">
           <Card className="p-5">
             <h2 className="mb-4 font-semibold">Taskの内容</h2>
-            <dl className="grid gap-5">
+            <dl className="grid grid-cols-1 gap-5">
               <div>
                 <dt className="text-sm text-muted">説明</dt>
-                <dd className="mt-1 whitespace-pre-wrap">{item.description || '未記入です。'}</dd>
+                <dd className="mt-1">
+                  <MarkdownContent>{item.description || '未記入です。'}</MarkdownContent>
+                </dd>
               </div>
               <div>
                 <dt className="text-sm text-muted">完了条件</dt>
-                <dd className="mt-1 whitespace-pre-wrap">
-                  {item.acceptanceCriteria || '未記入です。'}
+                <dd className="mt-1">
+                  <MarkdownContent>{item.acceptanceCriteria || '未記入です。'}</MarkdownContent>
                 </dd>
               </div>
               {item.blockedReason && (
                 <div>
                   <dt className="text-sm text-muted">blockedの理由</dt>
-                  <dd className="mt-1 whitespace-pre-wrap">{item.blockedReason}</dd>
+                  <dd className="mt-1">
+                    <MarkdownContent>{item.blockedReason}</MarkdownContent>
+                  </dd>
                 </div>
               )}
               {item.result && (
                 <div>
                   <dt className="text-sm text-muted">結果</dt>
-                  <dd className="mt-1 whitespace-pre-wrap">{item.result}</dd>
+                  <dd className="mt-1">
+                    <MarkdownContent>{item.result}</MarkdownContent>
+                  </dd>
                 </div>
               )}
             </dl>
@@ -726,7 +733,7 @@ export function TaskDetailPage() {
                 回答を添えて todo に戻すと、エージェントが通常の着手対象として再開します。
               </p>
             )}
-            <div className="grid gap-4">
+            <div className="grid grid-cols-1 gap-4">
               {item.comments.map((entry) => (
                 <article
                   className="border-b border-line pb-4 text-sm last:border-0 last:pb-0"
@@ -736,7 +743,7 @@ export function TaskDetailPage() {
                     <ActorDisplay actor={actor(actors.data, entry.createdBy)} />
                     <time className="text-muted">{date(entry.createdAt)}</time>
                   </div>
-                  <p className="whitespace-pre-wrap">{entry.body}</p>
+                  <MarkdownContent>{entry.body}</MarkdownContent>
                 </article>
               ))}
             </div>

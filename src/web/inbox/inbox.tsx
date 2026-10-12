@@ -1,3 +1,4 @@
+import { MarkdownContent } from '../components/markdown.js'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import {
@@ -402,7 +403,7 @@ export function InboxDetailPage() {
             <h2 className="font-semibold">本文</h2>
             <StatusBadge status={item.status} />
           </div>
-          <p className="whitespace-pre-wrap">{item.content}</p>
+          <MarkdownContent>{item.content}</MarkdownContent>
         </Card>
         <Card className="p-5">
           <dl className="grid gap-4 text-sm">

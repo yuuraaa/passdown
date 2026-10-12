@@ -1,3 +1,4 @@
+import { MarkdownContent } from '../components/markdown.js'
 import { useState } from 'react'
 import { Link, NavLink, useNavigate, useParams } from 'react-router'
 import {
@@ -360,7 +361,6 @@ export function ProjectDetailPage() {
             )}
           </div>
         }
-        lead={item.description || undefined}
         title={item.name}
       />
       <ProjectTabs id={item.id} />
@@ -437,13 +437,11 @@ function Overview({ project, edit }: { project: Project; edit: () => void }) {
             <h2 className="font-semibold">概要</h2>
             {active && <Button onClick={edit}>編集</Button>}
           </div>
-          <p className="whitespace-pre-wrap">{project.description || '未記入です。'}</p>
+          <MarkdownContent>{project.description || '未記入です。'}</MarkdownContent>
         </Card>
         <Card className="p-5">
           <h2 className="mb-3 font-semibold">Instructions</h2>
-          <p className="whitespace-pre-wrap font-mono text-sm">
-            {project.instructions || '未記入です。'}
-          </p>
+          <MarkdownContent>{project.instructions || '未記入です。'}</MarkdownContent>
         </Card>
         <Card className="p-5">
           <h2 className="mb-3 font-semibold">関連リポジトリ</h2>
