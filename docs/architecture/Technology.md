@@ -19,7 +19,7 @@
 | サーバーのデータの取得・更新 | TanStack Query |
 | ルーティング（Web UI） | React Router |
 | スタイル | Tailwind CSS |
-| Markdown の表示 | react-markdown ＋ remark-gfm |
+| Markdown と図の表示 | react-markdown ＋ remark-gfm ＋ mermaid |
 
 <a id="section-2-1"></a>
 
@@ -65,7 +65,8 @@
 - REST API は Hono RPC で呼び、サーバーのルートと zod の検証から推論した型をそのまま使う
 - サーバーのデータの取得・更新は TanStack Query で揃える（更新後の再取得、読み込み中・エラー・楽観ロックの競合の扱い）
 - すべての画面を PC とスマホの幅で使えるようにする（要件定義書 9.2）。スタイルは Tailwind CSS で書く
-- Document の Markdown は react-markdown ＋ remark-gfm で表示する。生の HTML は描画しない
+- 詳細画面の Markdown は共通の表示部品で react-markdown ＋ remark-gfm を使って表示する。生の HTML は描画しない。対象項目と図の挙動は [Web UI「Markdown と図」](Web_UI.md#section-8-6) に記載する
+- `mermaid` コードブロックは mermaid で SVG に変換する。Mermaid は図がある場合だけ動的に読み込み、`securityLevel: 'strict'` を固定する。本文の設定で制限が緩まないようにし、図のクリック動作は有効にしない
 
 <a id="section-2-5"></a>
 
