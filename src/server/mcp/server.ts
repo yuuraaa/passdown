@@ -98,7 +98,10 @@ function registerOperation(server: McpServer, deps: McpDeps, actor: Actor, op: M
  * 権限外のツールは表示しない（要件定義書 F-AUTH-04）。
  */
 export function buildMcpServer(deps: McpDeps, actor: Actor): McpServer {
-  const server = new McpServer({ name: 'passdown', version: '0.0.0' })
+  const server = new McpServer(
+    { name: 'passdown', version: '0.0.0' },
+    { maxToolInputElements: 10_000 },
+  )
   for (const op of deps.operations) {
     if (op.requires.every((p) => hasPermission(actor, p))) {
       registerOperation(server, deps, actor, op)

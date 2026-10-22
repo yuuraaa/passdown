@@ -130,6 +130,63 @@ describe('認証', () => {
   })
 })
 
+describe('入力のリソース制限', () => {
+  it('未認証でも 1 MiB を超える JSON 本文を解析前に拒否する', async () => {
+    const res = await post(
+      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { text: 'あ'.repeat(350_000) } },
+      {},
+    )
+    expect(res.status).toBe(413)
+  })
+
+  it('認証済みの巨大な書き込み本文も拒否して DB を変更しない', async () => {
+    const token = insertToken(database, insertActor(database))
+    const before = snapshotTables(database)
+    const res = await post(
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: {
+          name: 'create_document',
+          arguments: { title: '巨大な本文', content: 'x'.repeat(1024 * 1024) },
+        },
+      },
+      { Authorization: `Bearer ${token}` },
+    )
+    expect(res.status).toBe(413)
+    expect(changedTables(before, snapshotTables(database))).toEqual([])
+  })
+
+  it('100件を超える JSON-RPC バッチを拒否して DB を変更しない', async () => {
+    const token = insertToken(database, insertActor(database))
+    const before = snapshotTables(database)
+    const res = await post(
+      Array.from({ length: 101 }, (_, id) => ({
+        jsonrpc: '2.0',
+        id,
+        method: 'tools/call',
+        params: { name: 'create_document', arguments: { title: '大量の書き込み' } },
+      })),
+      { Authorization: `Bearer ${token}` },
+    )
+    expect(res.status).toBe(400)
+    expect(changedTables(before, snapshotTables(database))).toEqual([])
+  })
+
+  it('本文サイズ内でも大量の配列要素を持つ引数を拒否して DB を変更しない', async () => {
+    const token = insertToken(database, insertActor(database))
+    const before = snapshotTables(database)
+    const result = await callTool(token, 'create_document', {
+      title: '大量のタグ',
+      tags: Array.from({ length: 10_001 }, (_, i) => `tag-${i}`),
+    })
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('10000')
+    expect(changedTables(before, snapshotTables(database))).toEqual([])
+  })
+})
+
 describe('ツールの登録', () => {
   it('Document の作成・更新ツールには archived を含む既存タグを示す', async () => {
     const owner = insertActor(database)
