@@ -4,6 +4,9 @@ import type { Actor } from '../core/operation.js'
 import { authenticateToken } from '../modules/auth/index.js'
 import { buildMcpServer, type McpDeps } from './server.js'
 
+// JSON の解析前と transport の両方で同じ上限を使う。
+const maxRequestBodySize = 1024 * 1024
+
 // createMcpHonoApp は JSON の本文を解析して parsedBody に入れるが、その型を宣言していない
 declare module 'hono' {
   interface ContextVariableMap {
@@ -30,14 +33,18 @@ export function createMcpApp(deps: McpAppDeps) {
     host: '0.0.0.0',
     allowedHosts: deps.allowedHosts,
     allowedOrigins: deps.allowedHosts,
+    maxRequestBodySize,
   })
-  const handler = createMcpHandler(({ authInfo }) => {
-    const actor = authInfo?.extra?.actor as Actor | undefined
-    if (!actor) {
-      throw new Error('認証していないリクエストが MCP のサーバーに届きました')
-    }
-    return buildMcpServer(deps, actor)
-  })
+  const handler = createMcpHandler(
+    ({ authInfo }) => {
+      const actor = authInfo?.extra?.actor as Actor | undefined
+      if (!actor) {
+        throw new Error('認証していないリクエストが MCP のサーバーに届きました')
+      }
+      return buildMcpServer(deps, actor)
+    },
+    { maxRequestBodySize },
+  )
 
   app.all('/', async (c) => {
     const token = bearerToken(c.req.header('Authorization'))
